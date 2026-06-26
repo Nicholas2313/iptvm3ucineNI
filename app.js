@@ -836,5 +836,27 @@ const savedUrl = localStorage.getItem(LAST_M3U_URL_KEY);
 if (savedUrl && els.m3uUrl) {
   els.m3uUrl.value = savedUrl;
 }
+async function loadDefaultLibrary() {
+    try {
+        console.log("Carregando biblioteca padrão...");
 
+        const response = await fetch("/api/default-library");
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const items = await response.json();
+
+        const profile = getActiveProfile();
+
+        importItemsIntoProfile(profile, items);
+
+        rerender();
+
+    } catch (err) {
+        console.error("Erro carregando biblioteca:", err);
+    }
+}
 render();
+loadDefaultLibrary();
