@@ -839,11 +839,14 @@ if (savedUrl && els.m3uUrl) {
 async function loadDefaultLibrary() {
     try {
         console.log("Carregando biblioteca padrão...");
+    console.log("Antes do fetch");
 
-        const response = await fetch("/api/default-library");
+    const response = await fetch("/api/default-library");
+  
+    console.log("Depois do fetch");
+    console.log("Status:", response.status);
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
         }
 
         const items = await response.json();
