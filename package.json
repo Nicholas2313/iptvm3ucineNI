@@ -1,11 +1,11 @@
 {
-  "name": "calicine-iptv",
+  "name": "m3ucine",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Site local de IPTV com perfis, biblioteca e importacao M3U.",
+  "description": "Site local de IPTV com perfis, biblioteca, series Xtream e importacao M3U.",
   "scripts": {
-   "start": "node server.mjs",
-   "dev": "node server.mjs"
+    "start": "node outputs/server.mjs",
+    "dev": "node outputs/server.mjs"
   }
 }
