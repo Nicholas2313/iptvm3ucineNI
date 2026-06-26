@@ -257,6 +257,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`Nebula Play listening on http://127.0.0.1:${port}/`);
+server.listen(port, "0.0.0.0", () => {
+  console.log(`Nebula Play listening on http://0.0.0.0:${port}/`);
 });
