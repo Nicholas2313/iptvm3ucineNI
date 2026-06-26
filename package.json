@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Interface local para carregar M3U, perfis e catalogo IPTV.",
+  "description": "Site local de IPTV com perfis, biblioteca e importacao M3U.",
   "scripts": {
-    "start": "node outputs/server.mjs",
-    "dev": "node outputs/server.mjs"
+   "start": "node server.mjs",
+   "dev": "node server.mjs"
   }
 }
