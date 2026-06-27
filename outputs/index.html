@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>M3UCINE</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="./app.js"></script>
+  </head>
+  <body class="profile-gate">
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <a class="brand" href="#top" aria-label="M3UCINE">
+            <span class="brand-mark">M</span>
+            <span>M3UCINE</span>
+          </a>
+          <div class="profile-preview">
+            <img id="active-avatar" class="profile-avatar" alt="Foto de perfil ativa" />
+            <div>
+              <strong id="active-name">Perfil 1</strong>
+              <small id="active-meta">Carregando catalogo</small>
+            </div>
+          </div>
+        </div>
+
+        <nav class="main-nav" id="tabs" aria-label="Categorias">
+          <button class="tab active" data-tab="all" type="button">Inicio</button>
+          <button class="tab" data-tab="movies" type="button">Filmes</button>
+          <button class="tab" data-tab="series" type="button">Series</button>
+          <button class="tab" data-tab="favorites" type="button">Favoritos</button>
+        </nav>
+
+        <div class="top-actions">
+          <button class="ghost-btn" type="button" id="hero-play">Assistir</button>
+          <button class="primary-btn" type="button">Instalar app</button>
+          <button id="open-profile-btn" class="primary-btn subtle" type="button">Perfis</button>
+          <button class="primary-btn subtle" type="button">Sair</button>
+        </div>
+      </header>
+
+      <main id="top" class="content">
+        <section class="profile-hero" id="profiles">
+          <div class="profile-hero-head">
+            <p class="eyebrow">Perfis</p>
+            <h2>Quem está assistindo?</h2>
+            <p>Escolha um perfil ou edite o nome e a foto do perfil ativo.</p>
+          </div>
+
+          <div id="profile-grid" class="profile-grid"></div>
+
+          <div class="profile-hero-actions">
+            <button id="edit-profile-btn" class="primary-btn" type="button">Editar perfil</button>
+          </div>
+        </section>
+
+        <section class="hero-grid">
+          <article class="hero-panel">
+            <div class="hero-stage">
+              <video id="player" class="video-player" controls playsinline></video>
+              <div id="player-empty" class="player-empty">Nenhuma midia selecionada</div>
+            </div>
+
+            <div class="hero-footer">
+              <div class="hero-copy">
+                <p class="eyebrow">Catalogo local para filmes e series</p>
+                <h1 id="hero-headline">M3UCINE</h1>
+                <p id="hero-meta">Escolha um titulo para comecar.</p>
+                <p id="hero-description">
+                  Filmes e series em uma interface simples, azul escuro e parecida com streaming.
+                </p>
+              </div>
+
+              <div class="hero-actions">
+                <a id="download-link" class="action-link" href="#" download>Baixar</a>
+                <button id="open-link" class="action-link button-like" type="button">Abrir link</button>
+              </div>
+            </div>
+          </article>
+
+          <aside class="hero-side">
+            <div class="status-chip" id="catalog-status">AGUARDANDO CATALOGO</div>
+            <h2>Catalogo do M3U</h2>
+            <p>Cole o link da lista para carregar filmes e series.</p>
+            <div class="status-line" id="catalog-source">Aguardando o link do M3U.</div>
+            <div class="count-grid">
+              <div><strong id="catalog-count">0</strong><span>Itens</span></div>
+              <div><strong id="stat-favorites">0</strong><span>Favoritos</span></div>
+              <div><strong id="stat-movies">0</strong><span>Filmes</span></div>
+              <div><strong id="stat-series">0</strong><span>Series</span></div>
+            </div>
+          </aside>
+        </section>
+
+        <section class="filter-strip">
+          <div class="category-pills" aria-label="Filtros">
+            <button class="tab active pill-tab" data-tab="movies" type="button">Filmes <span id="stat-items">0</span></button>
+            <button class="tab pill-tab" data-tab="series" type="button">Series <span id="results-count">0</span></button>
+          </div>
+
+          <label class="search-box">
+            <span>Pesquisar titulo, categoria ou episodio</span>
+            <input id="search-input" type="search" placeholder="Pesquisar titulo, categoria ou episodio" />
+          </label>
+
+          <label class="select-box">
+            <span>Todas as categorias</span>
+            <select id="group-filter"></select>
+          </label>
+        </section>
+
+        <section class="rail-section search-only-section">
+          <div class="section-head">
+            <div>
+              <h2>Continuar assistindo</h2>
+              <p>Filmes e episodios salvos neste dispositivo.</p>
+            </div>
+            <button id="clear-history" class="ghost-btn" type="button">Limpar historico</button>
+          </div>
+          <div id="continue-grid" class="continue-grid"></div>
+        </section>
+
+        <section class="rail-section search-only-section">
+          <div class="section-head">
+            <div>
+              <h2>Categorias de Filmes</h2>
+              <p>Escolha uma categoria para carregar so aquele grupo de filmes.</p>
+            </div>
+          </div>
+          <div id="movie-categories" class="category-grid"></div>
+        </section>
+
+        <section class="rail-section search-only-section">
+          <div class="section-head">
+            <div>
+              <h2>Categorias de Series</h2>
+              <p>Filtre os episodios e series por grupo.</p>
+            </div>
+          </div>
+          <div id="series-categories" class="category-grid"></div>
+        </section>
+
+        <section class="rail-section">
+          <div class="section-head">
+            <div>
+              <h2 id="library-title">Biblioteca</h2>
+              <p>Filmes e series importados ou carregados automaticamente.</p>
+            </div>
+          </div>
+          <div id="library-grid" class="library-grid"></div>
+        </section>
+
+        <section class="manage-shell" id="manage-panel">
+          <form id="import-form" class="quick-import">
+            <div class="quick-import-copy">
+              <h2>Colar link do M3U</h2>
+              <p>É só colar o link da sua lista e tocar em carregar. Se você voltar depois, a página tenta lembrar o último link usado.</p>
+            </div>
+
+            <label class="field quick-import-field">
+              <span>Link do M3U</span>
+              <input id="m3u-url" type="url" placeholder="http://seu-servidor/get.php?username=...&password=..." />
+            </label>
+
+            <button type="submit" class="primary-btn quick-import-button">Carregar M3U</button>
+            <p id="import-status" class="status-line">Cole o link do M3U para carregar o catalogo.</p>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="series-modal" class="series-modal">
+      <form method="dialog" class="series-modal-card">
+        <div class="series-modal-hero">
+          <img id="series-modal-poster" alt="Pôster da série" class="series-modal-poster" />
+          <div class="series-modal-copy">
+            <div class="series-modal-head">
+              <div>
+                <p class="eyebrow">Série</p>
+                <h3 id="series-modal-title">Série</h3>
+                <p id="series-modal-meta" class="series-modal-meta">Temporadas e episódios</p>
+              </div>
+              <button id="close-series-modal" class="ghost-btn" type="button">Fechar</button>
+            </div>
+            <p id="series-modal-overview" class="series-modal-overview">Selecione uma temporada para ver os episódios.</p>
+            <div class="series-modal-actions">
+              <button id="play-first-episode" class="primary-btn" type="button">Assistir primeiro episódio</button>
+            </div>
+          </div>
+        </div>
+        <div class="series-modal-body">
+          <div id="series-season-tabs" class="series-season-tabs"></div>
+          <div id="series-episode-grid" class="series-episode-grid"></div>
+          <div id="series-modal-status" class="status-line"></div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="profile-modal" class="profile-modal">
+      <form id="profile-edit-form" method="dialog" class="profile-modal-card">
+        <div class="profile-modal-header">
+          <div>
+            <p class="eyebrow">Editar perfil</p>
+            <h3 id="profile-modal-title">Perfil</h3>
+          </div>
+          <button id="close-profile-modal" class="ghost-btn" type="button">Fechar</button>
+        </div>
+
+        <label class="field">
+          <span>Nome do perfil</span>
+          <input id="edit-profile-name" type="text" maxlength="24" />
+        </label>
+
+        <label class="field">
+          <span>Foto do perfil</span>
+          <input id="edit-profile-avatar" type="file" accept="image/*" />
+        </label>
+
+        <div class="profile-modal-preview">
+          <img id="edit-profile-avatar-preview" alt="Pré-visualização do perfil" />
+        </div>
+
+        <div class="profile-modal-actions">
+          <button class="primary-btn" type="submit">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>
