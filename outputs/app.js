@@ -13,7 +13,6 @@ const els = {
   activeMeta: document.getElementById("active-meta"),
   profileGrid: document.getElementById("profile-grid"),
   editProfileBtn: document.getElementById("edit-profile-btn"),
-  openProfileBtn: document.getElementById("open-profile-btn"),
   profileModal: document.getElementById("profile-modal"),
   profileEditForm: document.getElementById("profile-edit-form"),
   profileModalTitle: document.getElementById("profile-modal-title"),
@@ -39,19 +38,19 @@ const els = {
   importStatus: document.getElementById("import-status"),
   importButton: document.querySelector("#import-form button[type='submit']"),
   tabs: document.getElementById("tabs"),
+  exitBtn: document.getElementById("exit-btn"),
   searchInput: document.getElementById("search-input"),
   groupFilter: document.getElementById("group-filter"),
   libraryTitle: document.getElementById("library-title"),
   libraryGrid: document.getElementById("library-grid"),
+  favoriteGrid: document.getElementById("favorite-grid"),
   resultsCount: document.getElementById("results-count"),
   statItems: document.getElementById("stat-items"),
-  statFavorites: document.getElementById("stat-favorites"),
   statMovies: document.getElementById("stat-movies"),
   statSeries: document.getElementById("stat-series"),
   heroHeadline: document.getElementById("hero-headline"),
   heroMeta: document.getElementById("hero-meta"),
   heroDescription: document.getElementById("hero-description"),
-  heroPlay: document.getElementById("hero-play"),
   player: document.getElementById("player"),
   playerEmpty: document.getElementById("player-empty"),
   downloadLink: document.getElementById("download-link"),
@@ -61,7 +60,6 @@ const els = {
   seriesCategories: document.getElementById("series-categories"),
   catalogStatus: document.getElementById("catalog-status"),
   catalogSource: document.getElementById("catalog-source"),
-  catalogCount: document.getElementById("catalog-count"),
   clearHistory: document.getElementById("clear-history"),
 };
 
@@ -652,42 +650,147 @@ function formatTimeLabel(totalSeconds) {
   return `${minutes}:${String(remaining).padStart(2, "0")}`;
 }
 
+function readPositiveNumber(value) {
+  if (value === undefined || value === null) return 0;
+  const text = String(value).trim();
+  if (!text) return 0;
+  const direct = Number(text);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const compact = text.match(/^0*(\d{1,4})$/);
+  if (compact) return Number(compact[1]);
+  return 0;
+}
+
+function normalizeSeasonNumber(value, fallback = 1) {
+  const direct = readPositiveNumber(value);
+  if (direct > 0) return direct;
+  const text = String(value || "");
+  const seasonMatch = text.match(/(?:temporada|season|temp|t|s)\s*0*(\d{1,3})/i);
+  if (seasonMatch) return Number(seasonMatch[1]);
+  return fallback;
+}
+
+function normalizeEpisodeNumber(episode) {
+  const candidates = [
+    episode?.episodeNumber,
+    episode?.episode_num,
+    episode?.episode_number,
+    episode?.episode,
+    episode?.num,
+    episode?.info?.episode_num,
+    episode?.info?.episode_number,
+  ];
+  for (const candidate of candidates) {
+    const numeric = readPositiveNumber(candidate);
+    if (numeric > 0) return numeric;
+  }
+
+  const title = `${episode?.title || ""} ${episode?.name || ""} ${episode?.fullTitle || ""}`;
+  const codedMatch = title.match(/s\d{1,3}\s*e\s*0*(\d{1,4})/i);
+  if (codedMatch) return Number(codedMatch[1]);
+  const episodeMatch = title.match(/(?:episodio|episódio|episode|ep|e)\s*0*(\d{1,4})/i);
+  if (episodeMatch) return Number(episodeMatch[1]);
+  return 0;
+}
+
+function resolveEpisodeSeasonNumber(entry, episode, fallbackSeason = 1) {
+  const candidates = [
+    entry?.seasonNumber,
+    entry?.season,
+    entry?.season_number,
+    entry?.season_num,
+    episode?.seasonNumber,
+    episode?.season,
+    episode?.season_number,
+    episode?.season_num,
+    episode?.info?.season,
+    episode?.info?.season_number,
+  ];
+  for (const candidate of candidates) {
+    const seasonNumber = normalizeSeasonNumber(candidate, 0);
+    if (seasonNumber > 0) return seasonNumber;
+  }
+
+  const title = `${episode?.fullTitle || ""} ${episode?.title || ""} ${episode?.name || ""}`;
+  return normalizeSeasonNumber(title, fallbackSeason);
+}
+
+function getRawEpisodeId(episode) {
+  return String(
+    episode?.episodeId ||
+      episode?.episode_id ||
+      episode?.stream_id ||
+      episode?.id ||
+      episode?.info?.tmdb_id ||
+      ""
+  );
+}
+
+function buildSeasonName(season, seasonNumber) {
+  const rawName = season?.name || season?.title || "";
+  if (rawName && !/^season\s*\d+$/i.test(rawName)) return rawName;
+  return `Temporada ${seasonNumber || 1}`;
+}
+
 function normalizeSeriesPayload(payload, fallbackSeries) {
   const details = payload?.series || payload?.series_info || payload?.info || payload || {};
   const seasonsRaw = Array.isArray(details.seasons) ? details.seasons : Array.isArray(payload?.seasons) ? payload.seasons : [];
   const episodesRaw = payload?.episodes || details.episodes || {};
   const series = {
     seriesId: String(fallbackSeries.seriesId || details.series_id || payload?.series_id || ""),
-    title: details.name || fallbackSeries.title || "Serie",
-    logo: details.cover || details.cover_big || details.movie_image || fallbackSeries.logo || "",
+    title: details.name || details.title || fallbackSeries.title || "Serie",
+    logo: details.cover || details.cover_big || details.movie_image || details.logo || fallbackSeries.logo || "",
     plot: details.plot || fallbackSeries.plot || "",
     year: details.year || fallbackSeries.year || "",
     genre: details.genre || fallbackSeries.genre || "",
     rating: details.rating || fallbackSeries.rating || "",
     status: details.status || fallbackSeries.status || "",
-    base: fallbackSeries.base || "",
+    base: details.base || fallbackSeries.base || "",
   };
 
   const seasonMap = new Map();
-  for (const season of seasonsRaw) {
-    const seasonNumber = normalizeSeasonNumber(season.season_number ?? season.season_num ?? season.season);
+  const episodeEntries = [];
+
+  for (const [index, season] of seasonsRaw.entries()) {
+    const seasonNumber = normalizeSeasonNumber(
+      season.seasonNumber ?? season.season_number ?? season.season_num ?? season.season ?? season.id,
+      index + 1
+    );
     seasonMap.set(seasonNumber, {
       seasonNumber,
-      name: season.name || `Temporada ${seasonNumber || 1}`,
+      name: buildSeasonName(season, seasonNumber),
       episodes: [],
     });
+
+    if (Array.isArray(season.episodes)) {
+      episodeEntries.push(
+        ...season.episodes.map((episode) => ({
+          seasonNumber,
+          episode,
+        }))
+      );
+    }
   }
 
-  const episodeEntries = Array.isArray(episodesRaw)
-    ? episodesRaw.map((episode) => ({ seasonNumber: normalizeSeasonNumber(episode.season), episode }))
-    : Object.entries(episodesRaw).flatMap(([seasonKey, episodes]) => {
-        const seasonNumber = normalizeSeasonNumber(seasonKey);
+  if (Array.isArray(episodesRaw)) {
+    episodeEntries.push(
+      ...episodesRaw.map((episode) => ({
+        seasonNumber: resolveEpisodeSeasonNumber(null, episode, 1),
+        episode,
+      }))
+    );
+  } else {
+    episodeEntries.push(
+      ...Object.entries(episodesRaw).flatMap(([seasonKey, episodes]) => {
+        const seasonNumber = normalizeSeasonNumber(seasonKey, 1);
         return (Array.isArray(episodes) ? episodes : []).map((episode) => ({ seasonNumber, episode }));
-      });
+      })
+    );
+  }
 
   for (const entry of episodeEntries) {
-    const seasonNumber = normalizeSeasonNumber(entry.seasonNumber ?? entry.episode?.season);
     const episode = entry.episode || entry;
+    const seasonNumber = resolveEpisodeSeasonNumber(entry, episode, entry.seasonNumber || 1);
     if (!seasonMap.has(seasonNumber)) {
       seasonMap.set(seasonNumber, {
         seasonNumber,
@@ -697,26 +800,33 @@ function normalizeSeriesPayload(payload, fallbackSeries) {
     }
     const ext = episode.container_extension || episode.containerExtension || "mp4";
     const episodeNumber = normalizeEpisodeNumber(episode);
+    const rawEpisodeId = getRawEpisodeId(episode);
+    const episodeId = String(episode.id || "").startsWith("series-")
+      ? String(episode.id)
+      : `series-${series.seriesId}-s${seasonNumber}-e${episodeNumber || rawEpisodeId || stableId(episode.title || episode.name || "")}`;
     const normalizedEpisode = {
-      id: `series-${series.seriesId}-s${seasonNumber}-e${episodeNumber || episode.id}`,
+      id: episodeId,
       kind: "episode",
       type: "series",
       title: episode.title || episode.name || `Episodio ${episodeNumber || episode.id}`,
-      fullTitle: `${series.title} - T${seasonNumber || 1} EP${episodeNumber || episode.id}`,
+      fullTitle: episode.fullTitle || `${series.title} - T${seasonNumber || 1} EP${episodeNumber || rawEpisodeId || ""}`,
       group: series.title,
       logo: episode.info?.movie_image || episode.cover || series.logo || "",
       source: "Xtream",
-      base: series.base,
+      base: episode.base || series.base,
       seriesId: series.seriesId,
       seasonNumber,
       episodeNumber,
-      url: `${series.base}/series/${encodeURIComponent(xtreamUser)}/${encodeURIComponent(xtreamPassword)}/${episode.id}.${ext}`,
+      url: episode.url || (episode.streamUrl || ""),
       plot: episode.plot || episode.info?.plot || "",
       duration: episode.duration || episode.info?.duration || "",
       releaseDate: episode.releasedate || episode.release_date || "",
-      episodeId: String(episode.id || ""),
+      episodeId: rawEpisodeId,
+      extension: ext,
     };
-    seasonMap.get(seasonNumber).episodes.push(normalizedEpisode);
+    if (!seasonMap.get(seasonNumber).episodes.some((item) => item.id === normalizedEpisode.id)) {
+      seasonMap.get(seasonNumber).episodes.push(normalizedEpisode);
+    }
   }
 
   const seasons = Array.from(seasonMap.values())
@@ -731,7 +841,57 @@ function normalizeSeriesPayload(payload, fallbackSeries) {
   return { series, seasons };
 }
 
-function renderSeriesDetails() {
+function renderEpisodeCard(episode, state) {
+  const episodeNumber = episode.episodeNumber ? String(episode.episodeNumber).padStart(2, "0") : "--";
+  const seasonNumber = episode.seasonNumber || 1;
+  const poster = episode.logo || state.series?.logo || defaultAvatar(episode.title);
+  const duration = episode.duration ? `<span>${escapeHtml(episode.duration)}</span>` : "";
+
+  return `
+    <article class="episode-card ${state.selectedEpisodeId === episode.id ? "active" : ""}" data-episode-id="${escapeHtml(episode.id)}">
+      <img class="episode-poster" src="${poster}" alt="${escapeHtml(episode.fullTitle)}" />
+      <div class="episode-copy">
+        <div class="episode-topline">
+          <span class="episode-index">EP ${episodeNumber}</span>
+          <span class="chip">T${seasonNumber} · EP${episode.episodeNumber || ""}</span>
+          ${duration}
+        </div>
+        <h4>${escapeHtml(episode.title)}</h4>
+        <p>${escapeHtml(episode.plot || "Episodio disponivel para reproducao.")}</p>
+        <div class="episode-actions">
+          <button class="card-button play-episode-button" type="button" data-play-episode="${escapeHtml(episode.id)}">Assistir</button>
+          <button class="card-button ghost-btn" type="button" data-queue-episode="${escapeHtml(episode.id)}">Continuar</button>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderSeasonSection(season, state) {
+  const isActive = season.seasonNumber === state.activeSeason;
+  const countLabel = `${season.episodes.length} episodio${season.episodes.length === 1 ? "" : "s"}`;
+
+  return `
+    <section class="season-block ${isActive ? "active" : ""}" data-season-block="${season.seasonNumber}">
+      <div class="season-block-head">
+        <div>
+          <span class="season-kicker">Temporada ${season.seasonNumber || 1}</span>
+          <h4>${escapeHtml(season.name || `Temporada ${season.seasonNumber || 1}`)}</h4>
+        </div>
+        <span class="season-count">${countLabel}</span>
+      </div>
+      <div class="season-episode-list">
+        ${
+          season.episodes.length
+            ? season.episodes.map((episode) => renderEpisodeCard(episode, state)).join("")
+            : `<article class="empty-note">Nenhum episodio encontrado nesta temporada.</article>`
+        }
+      </div>
+    </section>
+  `;
+}
+
+function renderSeriesDetailsLegacy() {
   if (!els.seriesModal || !els.seriesModalTitle || !els.seriesSeasonTabs || !els.seriesEpisodeGrid) return;
   const state = currentSeriesState;
 
@@ -761,6 +921,7 @@ function renderSeriesDetails() {
   }
 
   const seasons = state.details?.seasons || [];
+  const activeSeason = seasons.find((season) => season.seasonNumber === state.activeSeason) || seasons[0];
   if (els.seriesSeasonTabs) {
     els.seriesSeasonTabs.innerHTML = seasons.length
       ? seasons
@@ -776,7 +937,6 @@ function renderSeriesDetails() {
       : `<div class="empty-note">Nenhuma temporada encontrada.</div>`;
   }
 
-  const activeSeason = seasons.find((season) => season.seasonNumber === state.activeSeason) || seasons[0];
   if (els.seriesEpisodeGrid) {
     els.seriesEpisodeGrid.innerHTML = activeSeason?.episodes?.length
       ? activeSeason.episodes
@@ -798,6 +958,61 @@ function renderSeriesDetails() {
           )
           .join("")
       : `<article class="empty-note">Nenhum episódio encontrado nesta temporada.</article>`;
+  }
+
+  if (els.playFirstEpisode) {
+    els.playFirstEpisode.disabled = !(activeSeason?.episodes?.length);
+  }
+}
+
+function renderSeriesDetails() {
+  if (!els.seriesModal || !els.seriesModalTitle || !els.seriesSeasonTabs || !els.seriesEpisodeGrid) return;
+  const state = currentSeriesState;
+  const seasons = state.details?.seasons || [];
+  const activeSeason = seasons.find((season) => season.seasonNumber === state.activeSeason) || seasons[0];
+  const episodeCount = seasons.reduce((sum, season) => sum + (season.episodes?.length || 0), 0);
+
+  if (els.seriesModalTitle) {
+    els.seriesModalTitle.textContent = state.series?.title || "Serie";
+  }
+  if (els.seriesModalMeta) {
+    els.seriesModalMeta.textContent = state.series
+      ? `${seasons.length} temporadas · ${episodeCount} episodios`
+      : "Detalhes da serie";
+  }
+  if (els.seriesModalPoster) {
+    els.seriesModalPoster.src = state.series?.logo || defaultAvatar(state.series?.title || "Serie");
+    els.seriesModalPoster.alt = state.series?.title || "Serie";
+  }
+  if (els.seriesModalOverview) {
+    els.seriesModalOverview.textContent =
+      state.series?.plot || "Escolha uma temporada e um episodio para assistir.";
+  }
+  if (els.seriesModalStatus) {
+    els.seriesModalStatus.textContent = state.loading
+      ? "Carregando temporadas e episodios..."
+      : state.error || "Temporadas e episodios organizados.";
+  }
+
+  if (els.seriesSeasonTabs) {
+    els.seriesSeasonTabs.innerHTML = seasons.length
+      ? seasons
+          .map(
+            (season) => `
+              <button class="season-pill ${season.seasonNumber === state.activeSeason ? "active" : ""}" type="button" data-season-number="${season.seasonNumber}">
+                ${escapeHtml(season.name || `Temporada ${season.seasonNumber || 1}`)}
+                <span>${season.episodes.length}</span>
+              </button>
+            `
+          )
+          .join("")
+      : `<div class="empty-note">Nenhuma temporada encontrada.</div>`;
+  }
+
+  if (els.seriesEpisodeGrid) {
+    els.seriesEpisodeGrid.innerHTML = seasons.length
+      ? seasons.map((season) => renderSeasonSection(season, state)).join("")
+      : `<article class="empty-note">Nenhum episodio encontrado nesta serie.</article>`;
   }
 
   if (els.playFirstEpisode) {
@@ -937,8 +1152,8 @@ function updateHero(profile, item) {
   if (!els.heroHeadline || !els.heroMeta || !els.heroDescription) return;
 
   if (!item) {
-    els.heroHeadline.textContent = APP_NAME;
-    els.heroMeta.textContent = "Pesquise para encontrar filmes e series.";
+    els.heroHeadline.textContent = "Biblioteca";
+    els.heroMeta.textContent = "Pesquise para encontrar resultados.";
     els.heroDescription.textContent = "Interface limpa, moderna e otimizada para buscar o que você quer assistir.";
     return;
   }
@@ -1008,8 +1223,8 @@ function selectItem(itemId, profile = getActiveProfile()) {
 function render() {
   const profile = getActiveProfile();
   const library = profile.library;
+  const favorites = library.filter((item) => profile.favorites.includes(item.id));
   const visible = getVisibleItems(profile);
-  const favoriteCount = profile.favorites.length;
   const movieCount = library.filter((item) => item.type === "movie").length;
   const seriesCount = library.filter((item) => item.type === "series").length;
   const query = normalizeText(searchTerm);
@@ -1043,7 +1258,6 @@ function render() {
   }
 
   if (els.statItems) els.statItems.textContent = String(library.length);
-  if (els.statFavorites) els.statFavorites.textContent = String(favoriteCount);
   if (els.statMovies) els.statMovies.textContent = String(movieCount);
   if (els.statSeries) els.statSeries.textContent = String(seriesCount);
   if (els.resultsCount) els.resultsCount.textContent = String(visible.length);
@@ -1065,14 +1279,15 @@ function render() {
     els.groupFilter.value = activeGroup;
   }
 
-  if (els.catalogCount) els.catalogCount.textContent = String(library.length);
   if (els.catalogStatus) {
-    els.catalogStatus.textContent = profile.library.length > 0 ? "Catalogo pronto" : "Aguardando catalogo";
+    els.catalogStatus.textContent = profile.library.length > 0 ? "PLAYLIST FUNCIONANDO" : "PLAYLIST COM ERRO";
+    els.catalogStatus.dataset.tone = profile.library.length > 0 ? "good" : "bad";
   }
   if (els.catalogSource) {
     els.catalogSource.textContent = profile.library.length > 0
-      ? "O catálogo foi carregado para este perfil."
-      : "O catálogo sera carregado automaticamente ou por M3U.";
+      ? "A playlist está funcionando."
+      : "A playlist não foi carregada.";
+    els.catalogSource.dataset.tone = profile.library.length > 0 ? "good" : "bad";
   }
   if (els.activeAvatar) {
     els.activeAvatar.src = renderAvatar(profile);
@@ -1090,6 +1305,11 @@ function render() {
         ? visible.map((item) => renderCard(item, profile)).join("")
         : renderEmptyState(profile)
       : renderEmptyState(profile);
+  }
+  if (els.favoriteGrid) {
+    els.favoriteGrid.innerHTML = favorites.length
+      ? favorites.map((item) => renderCard(item, profile)).join("")
+      : `<article class="empty-note">Nenhum favorito salvo ainda.</article>`;
   }
   if (els.continueGrid) els.continueGrid.innerHTML = renderHistory(profile);
   if (els.movieCategories) els.movieCategories.innerHTML = hasQuery ? buildCategoryCards(profile, "movie") : "";
@@ -1148,7 +1368,10 @@ els.editProfileBtn?.addEventListener("click", () => {
   openProfileEditor(getActiveProfile());
 });
 
-els.openProfileBtn?.addEventListener("click", () => {
+els.exitBtn?.addEventListener("click", () => {
+  activeTab = "all";
+  searchTerm = "";
+  if (els.searchInput) els.searchInput.value = "";
   openProfileGate();
 });
 
@@ -1215,12 +1438,6 @@ els.clearHistory?.addEventListener("click", () => {
   render();
 });
 
-els.heroPlay?.addEventListener("click", () => {
-  const profile = getActiveProfile();
-  const target = selectedItemId ? profile.library.find((item) => item.id === selectedItemId) : profile.library[0];
-  if (target) selectItem(target.id, profile);
-});
-
 els.importForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (isImporting) return;
@@ -1232,11 +1449,11 @@ els.importForm?.addEventListener("submit", async (event) => {
     els.importButton.disabled = true;
     els.importButton.textContent = "Carregando...";
   }
-  setStatus("Carregando link do M3U...");
+  setStatus("Carregando playlist automatica...");
 
   try {
     if (!url) {
-      setStatus("Cole o link do M3U para carregar.", "error");
+      setStatus("Playlist automatica indisponivel.", "error");
       return;
     }
 
@@ -1438,6 +1655,10 @@ els.seriesSeasonTabs?.addEventListener("click", (event) => {
   if (!Number.isFinite(seasonNumber)) return;
   currentSeriesState = { ...currentSeriesState, activeSeason: seasonNumber, selectedEpisodeId: null };
   renderSeriesDetails();
+  requestAnimationFrame(() => {
+    const target = els.seriesEpisodeGrid?.querySelector(`[data-season-block="${seasonNumber}"]`);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 });
 
 els.seriesEpisodeGrid?.addEventListener("click", (event) => {

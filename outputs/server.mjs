@@ -151,38 +151,88 @@ function normalizeSeriesShow(base, show) {
   };
 }
 
-function normalizeSeasonNumber(value) {
+function readPositiveNumber(value) {
   if (value === undefined || value === null) return 0;
-  const numeric = Number(String(value).replace(/[^\d]/g, ""));
-  return Number.isFinite(numeric) ? numeric : 0;
+  const text = String(value).trim();
+  if (!text) return 0;
+  const direct = Number(text);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const compact = text.match(/^0*(\d{1,4})$/);
+  if (compact) return Number(compact[1]);
+  return 0;
+}
+
+function normalizeSeasonNumber(value, fallback = 1) {
+  const direct = readPositiveNumber(value);
+  if (direct > 0) return direct;
+  const text = String(value || "");
+  const seasonMatch = text.match(/(?:temporada|season|temp|t|s)\s*0*(\d{1,3})/i);
+  if (seasonMatch) return Number(seasonMatch[1]);
+  return fallback;
 }
 
 function normalizeEpisodeNumber(episode) {
-  const candidates = [episode.episode_num, episode.episode_number, episode.episode, episode.num];
+  const candidates = [
+    episode.episodeNumber,
+    episode.episode_num,
+    episode.episode_number,
+    episode.episode,
+    episode.num,
+    episode.info?.episode_num,
+    episode.info?.episode_number,
+  ];
   for (const candidate of candidates) {
-    const numeric = Number(candidate);
-    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+    const numeric = readPositiveNumber(candidate);
+    if (numeric > 0) return numeric;
   }
+  const title = `${episode.title || ""} ${episode.name || ""} ${episode.fullTitle || ""}`;
+  const codedMatch = title.match(/s\d{1,3}\s*e\s*0*(\d{1,4})/i);
+  if (codedMatch) return Number(codedMatch[1]);
+  const episodeMatch = title.match(/(?:episodio|episódio|episode|ep|e)\s*0*(\d{1,4})/i);
+  if (episodeMatch) return Number(episodeMatch[1]);
   return 0;
+}
+
+function resolveEpisodeSeasonNumber(entry, episode, fallbackSeason = 1) {
+  const candidates = [
+    entry?.seasonNumber,
+    entry?.season,
+    entry?.season_number,
+    entry?.season_num,
+    episode?.seasonNumber,
+    episode?.season,
+    episode?.season_number,
+    episode?.season_num,
+    episode?.info?.season,
+    episode?.info?.season_number,
+  ];
+  for (const candidate of candidates) {
+    const seasonNumber = normalizeSeasonNumber(candidate, 0);
+    if (seasonNumber > 0) return seasonNumber;
+  }
+  const title = `${episode?.fullTitle || ""} ${episode?.title || ""} ${episode?.name || ""}`;
+  return normalizeSeasonNumber(title, fallbackSeason);
 }
 
 function normalizeEpisodeEntry(base, series, episode, seasonNumber) {
   const episodeNumber = normalizeEpisodeNumber(episode);
   const ext = episode.container_extension || episode.containerExtension || "mp4";
+  const rawEpisodeId = String(episode.episodeId || episode.episode_id || episode.stream_id || episode.id || "");
   return {
-    id: `series-${series.seriesId}-s${seasonNumber}-e${episodeNumber || episode.id}`,
+    id: `series-${series.seriesId}-s${seasonNumber}-e${episodeNumber || rawEpisodeId}`,
     kind: "episode",
     title: episode.title || episode.name || `Episodio ${episodeNumber || episode.id}`,
-    fullTitle: `${series.title} - T${seasonNumber} EP${episodeNumber || episode.id}`,
+    fullTitle: `${series.title} - T${seasonNumber} EP${episodeNumber || rawEpisodeId}`,
     group: series.title,
     type: "series",
-    url: `${base}/series/${xtreamUser}/${xtreamPassword}/${episode.id}.${ext}`,
+    url: episode.url || `${base}/series/${xtreamUser}/${xtreamPassword}/${rawEpisodeId}.${ext}`,
     logo: episode.info?.movie_image || episode.cover || series.logo || "",
     source: "Xtream",
     base,
     seriesId: series.seriesId,
     seasonNumber,
     episodeNumber,
+    episodeId: rawEpisodeId,
     plot: episode.plot || episode.info?.plot || "",
     duration: episode.duration || episode.info?.duration || "",
     releaseDate: episode.releasedate || episode.release_date || "",
@@ -206,11 +256,15 @@ function normalizeSeriesInfo(base, seriesId, payload) {
     genre: seriesInfo.genre || payload?.genre || "",
     rating: seriesInfo.rating || payload?.rating || "",
     status: seriesInfo.status || payload?.status || "",
+    base,
   };
 
   const seasonMap = new Map();
-  for (const season of rawSeasons) {
-    const seasonNumber = normalizeSeasonNumber(season.season_number ?? season.season_num ?? season.season);
+  for (const [index, season] of rawSeasons.entries()) {
+    const seasonNumber = normalizeSeasonNumber(
+      season.seasonNumber ?? season.season_number ?? season.season_num ?? season.season ?? season.id,
+      index + 1
+    );
     if (!seasonMap.has(seasonNumber)) {
       seasonMap.set(seasonNumber, {
         seasonNumber,
@@ -221,15 +275,18 @@ function normalizeSeriesInfo(base, seriesId, payload) {
   }
 
   const episodeGroups = Array.isArray(rawEpisodes)
-    ? rawEpisodes
+    ? rawEpisodes.map((episode) => ({
+        seasonNumber: resolveEpisodeSeasonNumber(null, episode, 1),
+        episode,
+      }))
     : Object.entries(rawEpisodes).flatMap(([seasonKey, episodes]) => {
-        const seasonNumber = normalizeSeasonNumber(seasonKey);
+        const seasonNumber = normalizeSeasonNumber(seasonKey, 1);
         return (Array.isArray(episodes) ? episodes : []).map((episode) => ({ seasonNumber, episode }));
       });
 
   for (const entry of episodeGroups) {
-    const seasonNumber = normalizeSeasonNumber(entry.seasonNumber ?? entry.season ?? entry.episode?.season);
     const episode = entry.episode || entry;
+    const seasonNumber = resolveEpisodeSeasonNumber(entry, episode, entry.seasonNumber || 1);
     const normalized = normalizeEpisodeEntry(base, { ...series, title: series.title, seriesId }, episode, seasonNumber);
     if (!seasonMap.has(seasonNumber)) {
       seasonMap.set(seasonNumber, {
