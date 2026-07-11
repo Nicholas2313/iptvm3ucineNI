@@ -22,20 +22,43 @@
             <span class="brand-mark">M</span>
             <span>M3UCINE</span>
           </a>
-          <div class="profile-preview">
-            <img id="active-avatar" class="profile-avatar" alt="Foto de perfil ativa" />
-            <div>
-              <strong id="active-name">Perfil 1</strong>
-              <small id="active-meta">Carregando catalogo</small>
-            </div>
-          </div>
         </div>
 
-        <div class="top-actions" id="tabs">
-          <button class="tab active" data-tab="all" type="button">Inicio</button>
-          <button class="tab" data-tab="favorites" type="button">Favoritos</button>
-          <button class="primary-btn" type="button">Instalar app</button>
-          <button id="exit-btn" class="primary-btn subtle" type="button">Sair</button>
+        <label class="global-search">
+          <span>Buscar</span>
+          <input id="search-input" type="search" placeholder="Buscar filmes, séries e animes..." />
+        </label>
+
+        <div class="top-actions">
+          <nav class="main-nav" id="tabs" aria-label="Navegação principal">
+            <button class="tab active" data-tab="all" type="button">Início</button>
+            <button class="tab" data-tab="favorites" type="button">Favoritos</button>
+          </nav>
+          <button class="install-btn primary-btn" type="button">Instalar app</button>
+          <div class="catalog-pill">
+            <span id="catalog-status">Conectando catálogo</span>
+            <small id="catalog-source">Carregando...</small>
+          </div>
+          <div class="profile-menu">
+            <button id="profile-menu-btn" class="profile-menu-btn" type="button" aria-haspopup="true" aria-expanded="false">
+              <img id="active-avatar" class="profile-avatar" alt="Foto de perfil ativa" />
+            </button>
+            <div id="profile-menu-panel" class="profile-menu-panel" hidden>
+              <div class="profile-menu-head">
+                <img id="menu-avatar" class="profile-avatar menu-avatar" alt="Foto de perfil" />
+                <div>
+                  <strong id="active-name">Perfil 1</strong>
+                  <small id="active-meta">Catálogo em espera</small>
+                </div>
+              </div>
+              <div class="profile-menu-meta">
+                <span>Biblioteca</span>
+                <strong id="profile-library-count">0 títulos</strong>
+              </div>
+              <button id="edit-profile-menu-btn" class="menu-item" type="button">Editar perfil</button>
+              <button id="exit-btn" class="menu-item danger" type="button">Sair do perfil</button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -54,61 +77,88 @@
           </div>
         </section>
 
-        <section class="hero-grid">
+        <section class="featured-banner" id="featured-banner">
+          <div class="featured-glow"></div>
+          <div class="featured-content">
+            <p class="eyebrow">Destaque do M3UCINE</p>
+            <h2 id="featured-title">Sua biblioteca cinematográfica</h2>
+            <p id="featured-description">Pesquise, continue de onde parou e encontre filmes, séries e animes em uma interface feita para maratonar.</p>
+            <div class="featured-actions">
+              <button class="primary-btn" type="button" data-focus-search>Buscar agora</button>
+              <button class="ghost-btn" type="button" data-scroll-continue>Continuar assistindo</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="hero-grid player-shell">
           <article class="hero-panel">
             <div class="hero-stage">
               <video id="player" class="video-player" controls playsinline></video>
-              <div id="player-empty" class="player-empty">Nenhuma midia selecionada</div>
+              <div id="player-empty" class="player-empty">Nenhuma mídia selecionada</div>
             </div>
 
             <div class="hero-footer">
               <div class="hero-copy">
-                <p class="eyebrow">Catalogo local</p>
                 <h1 id="hero-headline">Biblioteca</h1>
-                <p id="hero-meta">Pesquise para encontrar filmes e séries.</p>
-                <p id="hero-description">
-                  Interface limpa, moderna e otimizada para buscar o que você quer assistir.
-                </p>
+                <p id="hero-meta">Pesquise para encontrar filmes, séries e animes.</p>
+                <h3 id="hero-episode-title">Escolha um conteúdo para começar</h3>
+                <p id="hero-description">Interface limpa, moderna e otimizada para buscar o que você quer assistir.</p>
               </div>
 
               <div class="hero-actions">
-                <a id="download-link" class="action-link" href="#" download>Baixar</a>
-                <button id="open-link" class="action-link button-like" type="button">Abrir link</button>
+                <button id="hero-continue-btn" class="primary-btn play-button" type="button">Continuar assistindo</button>
+                <button id="hero-favorite-btn" class="ghost-btn" type="button">Favoritar</button>
+                <details class="more-menu">
+                  <summary aria-label="Mais ações">•••</summary>
+                  <div class="more-menu-panel">
+                    <a id="download-link" class="menu-item" href="#" download>Baixar</a>
+                    <button id="open-link" class="menu-item button-like" type="button">Abrir link</button>
+                    <button class="menu-item" type="button" data-focus-search>Buscar relacionados</button>
+                  </div>
+                </details>
               </div>
             </div>
           </article>
-
-          <aside class="hero-side">
-            <div class="status-chip" id="catalog-status">AGUARDANDO CATALOGO</div>
-            <h2>Catalogo do M3U</h2>
-            <div class="status-line" id="catalog-source">Carregando playlist automaticamente.</div>
-          </aside>
         </section>
 
-        <section class="filter-strip">
-          <div class="category-pills" aria-label="Filtros">
-            <button class="tab active pill-tab" data-tab="movies" type="button">Filmes</button>
-            <button class="tab pill-tab" data-tab="series" type="button">Series</button>
+        <section id="player-seasons-section" class="player-seasons-section" hidden>
+          <div class="section-head">
+            <div>
+              <h2>Temporadas</h2>
+              <p>Escolha uma temporada e continue qualquer episódio.</p>
+            </div>
+            <label class="season-select-box">
+              <span>Temporada</span>
+              <select id="player-season-select"></select>
+            </label>
           </div>
+          <div id="player-episode-list" class="episode-list"></div>
+        </section>
 
-          <label class="search-box">
-            <span>Pesquisar titulo, categoria ou episodio</span>
-            <input id="search-input" type="search" placeholder="Pesquisar titulo, categoria ou episodio" />
-          </label>
-
+        <section class="filter-strip search-results-controls">
           <label class="select-box">
-            <span>Todas as categorias</span>
+            <span>Filtro de categoria</span>
             <select id="group-filter"></select>
           </label>
         </section>
 
-        <section class="rail-section">
+        <section id="search-results-section" class="rail-section search-only-section">
+          <div class="section-head">
+            <div>
+              <h2 id="library-title">Resultados da busca</h2>
+              <p>Resultados encontrados na sua biblioteca.</p>
+            </div>
+          </div>
+          <div id="library-grid" class="library-grid"></div>
+        </section>
+
+        <section id="continue-section" class="rail-section">
           <div class="section-head">
             <div>
               <h2>Continuar assistindo</h2>
-              <p>Filmes e episodios salvos neste dispositivo.</p>
+              <p>Filmes e episódios salvos neste dispositivo.</p>
             </div>
-            <button id="clear-history" class="ghost-btn" type="button">Limpar historico</button>
+            <button id="clear-history" class="ghost-btn" type="button">Limpar histórico</button>
           </div>
           <div id="continue-grid" class="continue-grid"></div>
         </section>
@@ -116,23 +166,72 @@
         <section class="rail-section">
           <div class="section-head">
             <div>
-              <h2 id="library-title">Biblioteca</h2>
-              <p>Filmes e series importados ou carregados automaticamente.</p>
-            </div>
-          </div>
-          <div id="library-grid" class="library-grid"></div>
-        </section>
-
-        <section class="rail-section">
-          <div class="section-head">
-            <div>
               <h2>Favoritos</h2>
-              <p>Filmes e series que o usuario marcou para acessar rapido.</p>
+              <p>Filmes e séries que o usuário marcou para acessar rápido.</p>
             </div>
           </div>
           <div id="favorite-grid" class="library-grid"></div>
         </section>
 
+        <section class="rail-section home-rail">
+          <div class="section-head">
+            <div>
+              <h2>Adicionados recentemente</h2>
+              <p>Novidades prontas para assistir.</p>
+            </div>
+          </div>
+          <div id="recent-grid" class="library-grid"></div>
+        </section>
+
+        <section class="rail-section home-rail">
+          <div class="section-head">
+            <div>
+              <h2>Filmes populares</h2>
+              <p>Seleção de filmes da sua biblioteca.</p>
+            </div>
+          </div>
+          <div id="popular-movies-grid" class="library-grid"></div>
+        </section>
+
+        <section class="rail-section home-rail">
+          <div class="section-head">
+            <div>
+              <h2>Séries</h2>
+              <p>Temporadas e episódios organizados.</p>
+            </div>
+          </div>
+          <div id="series-grid" class="library-grid"></div>
+        </section>
+
+        <section class="rail-section home-rail">
+          <div class="section-head">
+            <div>
+              <h2>Animes</h2>
+              <p>Animes e animações para maratonar.</p>
+            </div>
+          </div>
+          <div id="anime-grid" class="library-grid"></div>
+        </section>
+
+        <section class="rail-section home-rail">
+          <div class="section-head">
+            <div>
+              <h2>Conteúdos recomendados</h2>
+              <p>Sugestões baseadas no catálogo carregado.</p>
+            </div>
+          </div>
+          <div id="recommended-grid" class="library-grid"></div>
+        </section>
+
+        <section class="rail-section similar-section">
+          <div class="section-head">
+            <div>
+              <h2>Conteúdos semelhantes</h2>
+              <p>Mais opções relacionadas ao que você selecionou.</p>
+            </div>
+          </div>
+          <div id="similar-grid" class="library-grid"></div>
+        </section>
       </main>
     </div>
 
