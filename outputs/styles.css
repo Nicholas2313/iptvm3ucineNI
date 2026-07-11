@@ -723,6 +723,12 @@ body.search-mode .search-only-section {
   font-size: 0.75rem;
 }
 
+.continue-body .continue-time {
+  color: #8fe1ff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .progress-meter {
   height: 5px;
   border-radius: 999px;

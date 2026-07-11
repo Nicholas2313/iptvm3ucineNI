@@ -7,6 +7,7 @@ const PROGRESS_KEY = "m3ucine-progress-v1";
 const LAST_M3U_URL_KEY = "m3ucine-last-m3u-url";
 const LEGACY_LAST_M3U_URL_KEY = "calicine-iptv-last-m3u-url";
 const MIN_CONTINUE_SECONDS = 8;
+const PLAYBACK_SAVE_INTERVAL_MS = 1000;
 
 const els = {
   activeAvatar: document.getElementById("active-avatar"),
@@ -75,6 +76,7 @@ let profileCatalogLoading = false;
 let activePlayback = null;
 let playbackRestoreTime = 0;
 let playbackSaveTimer = null;
+let lastPlaybackSaveAt = 0;
 const seriesDetailsCache = new Map();
 const seriesDetailsLoading = new Map();
 let currentSeriesState = {
@@ -321,6 +323,14 @@ function savePlaybackProgress(profileId, item, currentTime, duration, options = 
   saveProgressState();
 }
 
+function saveActivePlaybackProgress(options = {}) {
+  if (!activePlayback || !els.player) return;
+  const currentTime = Number(els.player.currentTime || 0);
+  const duration = Number(els.player.duration || 0);
+  savePlaybackProgress(activePlayback.profileId, activePlayback, currentTime, duration, options);
+  lastPlaybackSaveAt = Date.now();
+}
+
 function clearAllPlaybackProgress() {
   for (const key of Object.keys(progressState)) {
     delete progressState[key];
@@ -528,6 +538,7 @@ function renderHistory(profile) {
         <div class="continue-body">
           <h4>${escapeHtml(entry.title)}</h4>
           <p>${escapeHtml(entry.subtitle || "Continua assistindo")}</p>
+          <p class="continue-time">${formatTimeLabel(entry.currentTime)}${entry.duration ? ` de ${formatTimeLabel(entry.duration)}` : ""}</p>
           <div class="progress-meter"><span style="width:${getProgressPercent(entry)}%"></span></div>
           <div class="continue-actions">
             <button class="small-btn play-button" type="button" data-continue-progress="${escapeHtml(entry.key)}">Continuar</button>
@@ -1165,6 +1176,7 @@ function updatePlayer(profile, item) {
   if (!playable) {
     activePlayback = null;
     playbackRestoreTime = 0;
+    lastPlaybackSaveAt = 0;
     els.player.removeAttribute("src");
     els.player.load();
     els.playerEmpty.style.display = "grid";
@@ -1184,6 +1196,7 @@ function updatePlayer(profile, item) {
     profileId: profile.id,
     progressKey: buildPlaybackKey(item),
   };
+  lastPlaybackSaveAt = 0;
   els.player.src = item.url;
   els.player.load();
   els.downloadLink.href = item.url;
@@ -1427,6 +1440,7 @@ els.clearHistory?.addEventListener("click", () => {
   playbackSaveTimer = null;
   activePlayback = null;
   playbackRestoreTime = 0;
+  lastPlaybackSaveAt = 0;
   clearAllPlaybackProgress();
   clearAllHistoryStorage();
   render();
@@ -1560,50 +1574,50 @@ els.player?.addEventListener("loadedmetadata", () => {
 
 els.player?.addEventListener("timeupdate", () => {
   if (!activePlayback || !els.player) return;
+  const now = Date.now();
+  if (now - lastPlaybackSaveAt >= PLAYBACK_SAVE_INTERVAL_MS) {
+    saveActivePlaybackProgress();
+    return;
+  }
   clearTimeout(playbackSaveTimer);
   playbackSaveTimer = setTimeout(() => {
-    if (!activePlayback || !els.player) return;
-    savePlaybackProgress(
-      activePlayback.profileId,
-      activePlayback,
-      Number(els.player.currentTime || 0),
-      Number(els.player.duration || 0)
-    );
-  }, 600);
+    saveActivePlaybackProgress();
+  }, PLAYBACK_SAVE_INTERVAL_MS);
 });
 
 els.player?.addEventListener("pause", () => {
   if (!activePlayback || !els.player) return;
   clearTimeout(playbackSaveTimer);
-  savePlaybackProgress(
-    activePlayback.profileId,
-    activePlayback,
-    Number(els.player.currentTime || 0),
-    Number(els.player.duration || 0)
-  );
+  saveActivePlaybackProgress();
 });
 
 els.player?.addEventListener("seeked", () => {
   if (!activePlayback || !els.player) return;
   clearTimeout(playbackSaveTimer);
-  savePlaybackProgress(
-    activePlayback.profileId,
-    activePlayback,
-    Number(els.player.currentTime || 0),
-    Number(els.player.duration || 0)
-  );
+  saveActivePlaybackProgress();
 });
 
 els.player?.addEventListener("ended", () => {
   if (!activePlayback || !els.player) return;
   clearTimeout(playbackSaveTimer);
-  savePlaybackProgress(
-    activePlayback.profileId,
-    activePlayback,
-    Number(els.player.duration || 0),
-    Number(els.player.duration || 0),
-    { completed: true }
-  );
+  saveActivePlaybackProgress({ completed: true });
+});
+
+window.addEventListener("pagehide", () => {
+  clearTimeout(playbackSaveTimer);
+  saveActivePlaybackProgress();
+});
+
+window.addEventListener("beforeunload", () => {
+  clearTimeout(playbackSaveTimer);
+  saveActivePlaybackProgress();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    clearTimeout(playbackSaveTimer);
+    saveActivePlaybackProgress();
+  }
 });
 
 document.addEventListener("click", (event) => {
