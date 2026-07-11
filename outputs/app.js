@@ -56,8 +56,6 @@ const els = {
   downloadLink: document.getElementById("download-link"),
   openLink: document.getElementById("open-link"),
   continueGrid: document.getElementById("continue-grid"),
-  movieCategories: document.getElementById("movie-categories"),
-  seriesCategories: document.getElementById("series-categories"),
   catalogStatus: document.getElementById("catalog-status"),
   catalogSource: document.getElementById("catalog-source"),
   clearHistory: document.getElementById("clear-history"),
@@ -501,27 +499,6 @@ function buildGroupOptions(profile) {
     `<option value="all">Todas as categorias</option>`,
     ...groups.map((group) => `<option value="${escapeHtml(group)}">${escapeHtml(group)}</option>`),
   ].join("");
-}
-
-function buildCategoryCards(profile, type) {
-  const library = profile.library.filter((item) => item.type === type);
-  const groups = Array.from(new Set(library.map((item) => item.group || "Geral")));
-  if (!groups.length) return `<article class="empty-note">Nenhuma categoria encontrada.</article>`;
-
-  return groups
-    .slice(0, 10)
-    .map((group) => {
-      const count = library.filter((item) => (item.group || "Geral") === group).length;
-      return `
-        <button class="category-card" type="button" data-group="${escapeHtml(group)}">
-          <span class="category-mark">◆</span>
-          <strong>${escapeHtml(group)}</strong>
-          <small>${count} titulos</small>
-          <span class="category-cta">${type === "movie" ? "Ver filmes" : "Ver series"}</span>
-        </button>
-      `;
-    })
-    .join("");
 }
 
 function renderHistory(profile) {
@@ -1312,8 +1289,6 @@ function render() {
       : `<article class="empty-note">Nenhum favorito salvo ainda.</article>`;
   }
   if (els.continueGrid) els.continueGrid.innerHTML = renderHistory(profile);
-  if (els.movieCategories) els.movieCategories.innerHTML = hasQuery ? buildCategoryCards(profile, "movie") : "";
-  if (els.seriesCategories) els.seriesCategories.innerHTML = hasQuery ? buildCategoryCards(profile, "series") : "";
 
   document.body.classList.toggle("search-mode", hasQuery);
 
@@ -1538,22 +1513,6 @@ els.continueGrid?.addEventListener("click", (event) => {
 
   const card = event.target.closest("[data-item-id]");
   if (card) selectItem(card.dataset.itemId);
-});
-
-els.movieCategories?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-group]");
-  if (!button) return;
-  activeGroup = button.dataset.group;
-  if (els.groupFilter) els.groupFilter.value = activeGroup;
-  render();
-});
-
-els.seriesCategories?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-group]");
-  if (!button) return;
-  activeGroup = button.dataset.group;
-  if (els.groupFilter) els.groupFilter.value = activeGroup;
-  render();
 });
 
 els.player?.addEventListener("error", () => {
