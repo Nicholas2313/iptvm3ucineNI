@@ -90,9 +90,11 @@ video {
 .page-shell {
   position: relative;
   z-index: 1;
-  width: min(100%, 1560px);
-  margin: 0 auto;
-  padding: 0 clamp(12px, 2vw, 30px) 44px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 0 44px;
+  overflow-x: clip;
 }
 
 .topbar {
@@ -105,7 +107,7 @@ video {
   align-items: center;
   padding: 14px 18px;
   border: 1px solid rgba(99, 199, 255, 0.16);
-  border-radius: 0 0 22px 22px;
+  border-radius: 0 0 18px 18px;
   background: rgba(3, 11, 24, 0.76);
   box-shadow: var(--shadow);
   backdrop-filter: blur(22px);
@@ -393,6 +395,8 @@ video {
   display: grid;
   gap: 22px;
   margin-top: 16px;
+  width: 100%;
+  padding-inline: clamp(10px, 1.4vw, 20px);
 }
 
 body.profile-gate .topbar {
@@ -1223,7 +1227,7 @@ dialog::backdrop {
 
 @media (max-width: 860px) {
   .page-shell {
-    padding: 0 10px 32px;
+    padding: 0 0 32px;
   }
 
   .topbar {
