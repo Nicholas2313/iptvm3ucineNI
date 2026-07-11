@@ -25,17 +25,24 @@
   --ease: 180ms ease;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 html {
+  width: 100%;
+  max-width: 100%;
   min-height: 100%;
+  margin: 0;
   scroll-behavior: smooth;
-  overflow-x: clip;
+  overflow-x: hidden;
 }
 
 body {
+  width: 100%;
+  max-width: 100%;
   min-height: 100%;
   margin: 0;
   color: var(--text);
@@ -44,7 +51,7 @@ body {
     radial-gradient(circle at 88% 10%, rgba(6, 93, 255, 0.2), transparent 32rem),
     linear-gradient(180deg, #061833 0%, #030b18 42%, #020711 100%);
   font-family: "Manrope", "Inter", "Segoe UI", sans-serif;
-  overflow-x: clip;
+  overflow-x: hidden;
 }
 
 body::before {
@@ -91,20 +98,24 @@ video {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: none;
+  max-width: 100%;
+  min-width: 0;
   margin: 0;
   padding: 0 0 44px;
-  overflow-x: clip;
+  overflow-x: hidden;
 }
 
 .topbar {
   position: sticky;
   top: 0;
   z-index: 100;
-  display: grid;
-  grid-template-columns: auto minmax(280px, 1fr) auto;
-  gap: 18px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 14px;
   align-items: center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 14px 18px;
   border: 1px solid rgba(99, 199, 255, 0.16);
   border-radius: 0 0 18px 18px;
@@ -130,6 +141,7 @@ video {
 }
 
 .brand-wrap {
+  flex: 0 0 auto;
   min-width: 0;
 }
 
@@ -160,8 +172,15 @@ video {
 
 .global-search {
   position: relative;
-  width: min(100%, 620px);
-  justify-self: center;
+  width: 100%;
+  min-width: 0;
+  justify-self: auto;
+}
+
+.header-search {
+  flex: 1 1 420px;
+  min-width: 0;
+  max-width: 650px;
 }
 
 .global-search span {
@@ -214,13 +233,17 @@ video {
 }
 
 .top-actions {
+  flex: 0 0 auto;
   justify-content: flex-end;
   gap: 10px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .main-nav {
+  flex: 0 0 auto;
   gap: 8px;
+  min-width: 0;
 }
 
 .tab,
@@ -333,7 +356,8 @@ video {
   position: absolute;
   right: 0;
   top: calc(100% + 12px);
-  width: min(320px, calc(100vw - 32px));
+  width: 320px;
+  max-width: calc(100dvw - 32px);
   padding: 14px;
   border: 1px solid rgba(99, 199, 255, 0.22);
   border-radius: 22px;
@@ -396,6 +420,8 @@ video {
   gap: 22px;
   margin-top: 16px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding-inline: clamp(10px, 1.4vw, 20px);
 }
 
@@ -512,6 +538,9 @@ body:not(.profile-gate) .profile-hero {
 
 .featured-banner {
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 0;
   height: clamp(240px, 28vw, 380px);
   display: flex;
@@ -532,7 +561,10 @@ body:not(.profile-gate) .profile-hero {
 
 .featured-glow {
   position: absolute;
-  inset: auto -10% -35% 38%;
+  right: 0;
+  bottom: -35%;
+  left: auto;
+  width: min(70%, 900px);
   height: 72%;
   background: radial-gradient(circle, rgba(66, 215, 255, 0.16), transparent 62%);
   filter: blur(12px);
@@ -568,9 +600,15 @@ body:not(.profile-gate) .profile-hero {
 
 .hero-grid {
   display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .hero-panel {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   border-radius: var(--radius-xl);
   background: rgba(5, 14, 30, 0.86);
@@ -580,6 +618,8 @@ body:not(.profile-gate) .profile-hero {
 .hero-stage {
   position: relative;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   aspect-ratio: 16 / 9;
   background: #000;
 }
@@ -737,6 +777,9 @@ body.search-mode .search-only-section {
 
 .rail-section,
 .player-seasons-section {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: clamp(12px, 1.6vw, 20px);
   border-radius: var(--radius-lg);
   background: rgba(5, 14, 30, 0.66);
@@ -762,37 +805,98 @@ body.search-mode .search-only-section {
   color: var(--muted);
 }
 
-.library-grid {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(154px, 190px);
-  gap: 16px;
+.carousel-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.library-grid,
+.continue-grid {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.library-grid,
+.carousel-track {
+  display: flex;
+  gap: 14px;
   overflow-x: auto;
   overflow-y: hidden;
   padding: 4px 2px 18px;
+  scroll-behavior: smooth;
   scroll-snap-type: x proximity;
-  max-width: 100%;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
 }
 
 .library-grid::-webkit-scrollbar,
+.carousel-track::-webkit-scrollbar {
+  display: none;
+}
+
 .episode-list::-webkit-scrollbar {
   height: 8px;
 }
 
-.library-grid::-webkit-scrollbar-thumb,
 .episode-list::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(66, 215, 255, 0.32);
 }
 
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 5;
+  width: 44px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(99, 199, 255, 0.28);
+  border-radius: 999px;
+  color: var(--text);
+  background: rgba(2, 8, 18, 0.72);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.35), 0 0 22px rgba(66, 215, 255, 0.16);
+  transform: translateY(-50%);
+  transition: opacity var(--ease), transform var(--ease), background var(--ease);
+}
+
+.carousel-arrow:hover,
+.carousel-arrow:focus-visible {
+  background: rgba(8, 33, 66, 0.9);
+  transform: translateY(-50%) scale(1.04);
+}
+
+.carousel-arrow-left {
+  left: 8px;
+}
+
+.carousel-arrow-right {
+  right: 8px;
+}
+
+.carousel-arrow:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .search-only-section .library-grid {
-  grid-auto-flow: row;
+  display: grid;
   grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
   overflow: visible;
 }
 
+.search-only-section .media-card {
+  flex: initial;
+}
+
 .media-card {
   position: relative;
+  flex: 0 0 clamp(150px, 14vw, 210px);
+  min-width: 0;
   min-width: 0;
   display: grid;
   gap: 10px;
@@ -881,6 +985,7 @@ body.search-mode .search-only-section {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .media-info p {
@@ -919,14 +1024,9 @@ body.search-mode .search-only-section {
   text-align: center;
 }
 
-.continue-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
-  max-width: 100%;
-}
-
 .continue-card {
+  flex: 0 0 clamp(280px, 28vw, 370px);
+  min-width: 0;
   display: grid;
   grid-template-columns: 78px 1fr;
   gap: 14px;
@@ -1084,7 +1184,8 @@ body.search-mode .search-only-section {
 
 .rail-section.is-empty .section-head p,
 .rail-section.is-empty .library-grid,
-.rail-section.is-empty .continue-grid {
+.rail-section.is-empty .continue-grid,
+.rail-section.is-empty .carousel-wrapper {
   display: none;
 }
 
@@ -1207,17 +1308,16 @@ dialog::backdrop {
 
 @media (max-width: 1180px) {
   .topbar {
-    grid-template-columns: auto 1fr;
+    flex-wrap: wrap;
   }
 
-  .global-search {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    width: 100%;
+  .header-search {
+    flex: 1 1 360px;
+    max-width: none;
   }
 
   .top-actions {
-    justify-self: end;
+    margin-left: auto;
   }
 
   .catalog-pill {
@@ -1235,6 +1335,7 @@ dialog::backdrop {
     gap: 12px;
     padding: 12px;
     border-radius: 20px;
+    align-items: center;
   }
 
   .brand {
@@ -1286,16 +1387,11 @@ dialog::backdrop {
   }
 
   .library-grid {
-    grid-auto-columns: minmax(132px, 44vw);
     gap: 12px;
   }
 
   .search-only-section .library-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .continue-grid {
-    grid-template-columns: 1fr;
   }
 
   .section-head {
@@ -1320,25 +1416,28 @@ dialog::backdrop {
 
 @media (max-width: 560px) {
   .topbar {
-    grid-template-columns: 1fr auto;
+    flex-wrap: wrap;
   }
 
   .main-nav {
-    order: 2;
-    width: 100%;
+    width: auto;
   }
 
   .top-actions {
-    display: grid;
-    grid-template-columns: 1fr auto;
-  }
-
-  .top-actions .main-nav {
-    grid-column: 1 / -1;
+    display: flex;
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
   }
 
   .tab {
-    flex: 1;
+    flex: 0 0 auto;
+  }
+
+  .header-search {
+    order: 3;
+    flex: 1 1 100%;
+    max-width: none;
   }
 
   .global-search input {
@@ -1346,7 +1445,7 @@ dialog::backdrop {
   }
 
   .profile-menu-panel {
-    right: -4px;
+    right: 0;
   }
 
   .featured-banner,
@@ -1383,10 +1482,6 @@ dialog::backdrop {
 
   .hero-actions .play-button {
     grid-column: 1 / -1;
-  }
-
-  .library-grid {
-    grid-auto-columns: 42vw;
   }
 
   .search-only-section .library-grid {

@@ -24,15 +24,14 @@
           </a>
         </div>
 
-        <label class="global-search">
+        <label class="global-search header-search">
           <span>Buscar</span>
           <input id="search-input" type="search" placeholder="Buscar filmes, séries e animes..." />
         </label>
 
-        <div class="top-actions">
+        <div class="top-actions header-actions">
           <nav class="main-nav" id="tabs" aria-label="Navegação principal">
             <button class="tab active" data-tab="all" type="button">Início</button>
-            <button class="tab" data-tab="favorites" type="button">Favoritos</button>
           </nav>
           <button class="install-btn primary-btn" type="button">Instalar app</button>
           <div class="catalog-pill">
@@ -160,7 +159,11 @@
             </div>
             <button id="clear-history" class="ghost-btn" type="button">Limpar histórico</button>
           </div>
-          <div id="continue-grid" class="continue-grid"></div>
+          <div class="carousel-wrapper">
+            <button class="carousel-arrow carousel-arrow-left" type="button" data-carousel-target="continue-grid" data-carousel-dir="-1" aria-label="Voltar carrossel">‹</button>
+            <div id="continue-grid" class="continue-grid carousel-track"></div>
+            <button class="carousel-arrow carousel-arrow-right" type="button" data-carousel-target="continue-grid" data-carousel-dir="1" aria-label="Avançar carrossel">›</button>
+          </div>
         </section>
 
         <section id="favorites-section" class="rail-section">
@@ -170,7 +173,11 @@
               <p>Filmes e séries que o usuário marcou para acessar rápido.</p>
             </div>
           </div>
-          <div id="favorite-grid" class="library-grid"></div>
+          <div class="carousel-wrapper">
+            <button class="carousel-arrow carousel-arrow-left" type="button" data-carousel-target="favorite-grid" data-carousel-dir="-1" aria-label="Voltar favoritos">‹</button>
+            <div id="favorite-grid" class="library-grid carousel-track"></div>
+            <button class="carousel-arrow carousel-arrow-right" type="button" data-carousel-target="favorite-grid" data-carousel-dir="1" aria-label="Avançar favoritos">›</button>
+          </div>
         </section>
 
         <section class="rail-section home-rail">
@@ -180,7 +187,11 @@
               <p>Novidades prontas para assistir.</p>
             </div>
           </div>
-          <div id="recent-grid" class="library-grid"></div>
+          <div class="carousel-wrapper">
+            <button class="carousel-arrow carousel-arrow-left" type="button" data-carousel-target="recent-grid" data-carousel-dir="-1" aria-label="Voltar adicionados recentemente">‹</button>
+            <div id="recent-grid" class="library-grid carousel-track"></div>
+            <button class="carousel-arrow carousel-arrow-right" type="button" data-carousel-target="recent-grid" data-carousel-dir="1" aria-label="Avançar adicionados recentemente">›</button>
+          </div>
         </section>
 
         <section class="rail-section home-rail">
@@ -190,7 +201,11 @@
               <p>Seleção de filmes da sua biblioteca.</p>
             </div>
           </div>
-          <div id="popular-movies-grid" class="library-grid"></div>
+          <div class="carousel-wrapper">
+            <button class="carousel-arrow carousel-arrow-left" type="button" data-carousel-target="popular-movies-grid" data-carousel-dir="-1" aria-label="Voltar filmes populares">‹</button>
+            <div id="popular-movies-grid" class="library-grid carousel-track"></div>
+            <button class="carousel-arrow carousel-arrow-right" type="button" data-carousel-target="popular-movies-grid" data-carousel-dir="1" aria-label="Avançar filmes populares">›</button>
+          </div>
         </section>
 
         <section class="rail-section home-rail">
@@ -200,7 +215,11 @@
               <p>Temporadas e episódios organizados.</p>
             </div>
           </div>
-          <div id="series-grid" class="library-grid"></div>
+          <div class="carousel-wrapper">
+            <button class="carousel-arrow carousel-arrow-left" type="button" data-carousel-target="series-grid" data-carousel-dir="-1" aria-label="Voltar séries">‹</button>
+            <div id="series-grid" class="library-grid carousel-track"></div>
+            <button class="carousel-arrow carousel-arrow-right" type="button" data-carousel-target="series-grid" data-carousel-dir="1" aria-label="Avançar séries">›</button>
+          </div>
         </section>
 
         <section class="rail-section home-rail">
@@ -210,7 +229,11 @@
               <p>Animes e animações para maratonar.</p>
             </div>
           </div>
-          <div id="anime-grid" class="library-grid"></div>
+          <div class="carousel-wrapper">
+            <button class="carousel-arrow carousel-arrow-left" type="button" data-carousel-target="anime-grid" data-carousel-dir="-1" aria-label="Voltar animes">‹</button>
+            <div id="anime-grid" class="library-grid carousel-track"></div>
+            <button class="carousel-arrow carousel-arrow-right" type="button" data-carousel-target="anime-grid" data-carousel-dir="1" aria-label="Avançar animes">›</button>
+          </div>
         </section>
 
         <section class="rail-section home-rail">
@@ -220,7 +243,11 @@
               <p>Sugestões baseadas no catálogo carregado.</p>
             </div>
           </div>
-          <div id="recommended-grid" class="library-grid"></div>
+          <div class="carousel-wrapper">
+            <button class="carousel-arrow carousel-arrow-left" type="button" data-carousel-target="recommended-grid" data-carousel-dir="-1" aria-label="Voltar conteúdos recomendados">‹</button>
+            <div id="recommended-grid" class="library-grid carousel-track"></div>
+            <button class="carousel-arrow carousel-arrow-right" type="button" data-carousel-target="recommended-grid" data-carousel-dir="1" aria-label="Avançar conteúdos recomendados">›</button>
+          </div>
         </section>
 
         <section class="rail-section similar-section">
@@ -230,7 +257,11 @@
               <p>Mais opções relacionadas ao que você selecionou.</p>
             </div>
           </div>
-          <div id="similar-grid" class="library-grid"></div>
+          <div class="carousel-wrapper">
+            <button class="carousel-arrow carousel-arrow-left" type="button" data-carousel-target="similar-grid" data-carousel-dir="-1" aria-label="Voltar conteúdos semelhantes">‹</button>
+            <div id="similar-grid" class="library-grid carousel-track"></div>
+            <button class="carousel-arrow carousel-arrow-right" type="button" data-carousel-target="similar-grid" data-carousel-dir="1" aria-label="Avançar conteúdos semelhantes">›</button>
+          </div>
         </section>
       </main>
     </div>

@@ -1512,6 +1512,46 @@ function syncTabs() {
   });
 }
 
+function resetHomeView() {
+  activeTab = "all";
+  activeGroup = "all";
+  searchTerm = "";
+  selectedItemId = null;
+  inlineSeriesState = { loading: false, seriesItem: null, details: null, activeSeason: null, selectedEpisodeId: null };
+  if (els.searchInput) els.searchInput.value = "";
+  if (els.groupFilter) els.groupFilter.value = "all";
+  render();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function getCarouselTrack(targetId) {
+  return targetId ? document.getElementById(targetId) : null;
+}
+
+function updateCarouselControls() {
+  document.querySelectorAll(".carousel-wrapper").forEach((wrapper) => {
+    const track = wrapper.querySelector(".carousel-track");
+    const left = wrapper.querySelector('[data-carousel-dir="-1"]');
+    const right = wrapper.querySelector('[data-carousel-dir="1"]');
+    if (!track || !left || !right) return;
+    const maxScroll = Math.max(0, track.scrollWidth - track.clientWidth);
+    const canScroll = maxScroll > 4;
+    left.disabled = !canScroll || track.scrollLeft <= 4;
+    right.disabled = !canScroll || track.scrollLeft >= maxScroll - 4;
+    wrapper.classList.toggle("is-scrollable", canScroll);
+  });
+}
+
+function scrollCarousel(targetId, direction) {
+  const track = getCarouselTrack(targetId);
+  if (!track) return;
+  track.scrollBy({
+    left: track.clientWidth * 0.8 * direction,
+    behavior: "smooth",
+  });
+  setTimeout(updateCarouselControls, 260);
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -1982,6 +2022,7 @@ function render() {
   document.body.classList.toggle("search-mode", hasQuery);
 
   syncTabs();
+  requestAnimationFrame(updateCarouselControls);
 }
 
 function rerender() {
@@ -2070,9 +2111,34 @@ els.editProfileAvatar?.addEventListener("change", async () => {
 els.tabs?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-tab]");
   if (!button) return;
+  if (button.dataset.tab === "all") {
+    resetHomeView();
+    return;
+  }
   activeTab = button.dataset.tab;
   render();
 });
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-carousel-target]");
+  if (!button) return;
+  scrollCarousel(button.dataset.carouselTarget, Number(button.dataset.carouselDir || 1));
+});
+
+document.addEventListener("keydown", (event) => {
+  if (!["ArrowLeft", "ArrowRight", "Enter", " "].includes(event.key)) return;
+  const button = event.target.closest?.("[data-carousel-target]");
+  if (!button) return;
+  event.preventDefault();
+  const direction = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : Number(button.dataset.carouselDir || 1);
+  scrollCarousel(button.dataset.carouselTarget, direction);
+});
+
+document.querySelectorAll(".carousel-track").forEach((track) => {
+  track.addEventListener("scroll", () => requestAnimationFrame(updateCarouselControls), { passive: true });
+});
+
+window.addEventListener("resize", () => requestAnimationFrame(updateCarouselControls));
 
 els.searchInput?.addEventListener("input", () => {
   searchTerm = els.searchInput.value;
