@@ -10,6 +10,9 @@ const MIN_CONTINUE_SECONDS = 8;
 const PLAYBACK_SAVE_INTERVAL_MS = 1000;
 const LIBRARY_FETCH_TIMEOUT_MS = 45000;
 const MAX_LIBRARY_ITEMS = 20000;
+const PROFILE_SYNC_ENDPOINT = "/api/profile-state";
+const PROFILE_SYNC_DEBOUNCE_MS = 700;
+const AVATAR_SIZE = 512;
 
 const els = {
   activeAvatar: document.getElementById("active-avatar"),
@@ -74,6 +77,9 @@ const recentHistory = loadHistory();
 let isImporting = false;
 let profileGateOpen = false;
 let profileCatalogLoading = false;
+let profileSyncTimer = null;
+let profileSyncBusy = false;
+let profileSyncPending = false;
 let activePlayback = null;
 let playbackRestoreTime = 0;
 let playbackSaveTimer = null;
@@ -104,26 +110,42 @@ function stableId(value) {
 }
 
 function defaultAvatar(name) {
-  const initials = (name || "P")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("");
-  const hue = ((name || "P").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0) * 17) % 360;
+  const seed = (name || "Perfil").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  const hue = 196 + (seed % 34);
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
       <defs>
         <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stop-color="hsl(${hue}, 100%, 72%)" />
-          <stop offset="100%" stop-color="hsl(${(hue + 50) % 360}, 100%, 52%)" />
+          <stop offset="0%" stop-color="hsl(${hue}, 100%, 64%)" />
+          <stop offset="55%" stop-color="hsl(${(hue + 18) % 360}, 100%, 48%)" />
+          <stop offset="100%" stop-color="#031126" />
         </linearGradient>
+        <radialGradient id="a" cx="35%" cy="24%" r="72%">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.55)" />
+          <stop offset="42%" stop-color="rgba(74,202,255,0.22)" />
+          <stop offset="100%" stop-color="rgba(0,0,0,0)" />
+        </radialGradient>
       </defs>
-      <rect width="240" height="240" rx="48" fill="url(#g)"/>
-      <circle cx="120" cy="98" r="58" fill="rgba(255,255,255,0.14)"/>
-      <text x="50%" y="56%" text-anchor="middle" font-family="Arial, sans-serif" font-size="68" font-weight="700" fill="#03111f">${initials}</text>
+      <rect width="240" height="240" rx="120" fill="url(#g)"/>
+      <rect width="240" height="240" rx="120" fill="url(#a)"/>
+      <circle cx="120" cy="91" r="43" fill="rgba(226,248,255,0.86)"/>
+      <path d="M48 205c9-49 36-75 72-75s63 26 72 75c-20 14-44 21-72 21s-52-7-72-21z" fill="rgba(226,248,255,0.76)"/>
+      <circle cx="120" cy="120" r="112" fill="none" stroke="rgba(158,224,255,0.55)" stroke-width="8"/>
     </svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function isLegacyGeneratedAvatar(avatar) {
+  if (typeof avatar !== "string" || !avatar.startsWith("data:image/svg+xml")) return false;
+  try {
+    return decodeURIComponent(avatar).includes("<text");
+  } catch {
+    return avatar.includes("%3Ctext") || avatar.includes("<text");
+  }
+}
+
+function normalizeAvatarValue(avatar, name) {
+  return avatar && !isLegacyGeneratedAvatar(avatar) ? avatar : defaultAvatar(name);
 }
 
 function profileCardLabel(index, profile, activeId) {
@@ -150,6 +172,47 @@ function closeProfileEditor() {
     els.profileModal.close();
   } else {
     els.profileModal.removeAttribute("open");
+  }
+}
+
+function readFileAsDataUrl(file, fallbackName) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || defaultAvatar(fallbackName)));
+    reader.onerror = () => resolve(defaultAvatar(fallbackName));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImageSource(source) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = source;
+  });
+}
+
+async function fileToAvatarDataUrl(file, fallbackName) {
+  const raw = await readFileAsDataUrl(file, fallbackName);
+  try {
+    const image = await loadImageSource(raw);
+    const canvas = document.createElement("canvas");
+    canvas.width = AVATAR_SIZE;
+    canvas.height = AVATAR_SIZE;
+    const context = canvas.getContext("2d");
+    if (!context) return raw;
+
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    const side = Math.min(sourceWidth, sourceHeight);
+    const sx = Math.max(0, (sourceWidth - side) / 2);
+    const sy = Math.max(0, (sourceHeight - side) / 2);
+
+    context.drawImage(image, sx, sy, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
+    return canvas.toDataURL("image/jpeg", 0.86);
+  } catch {
+    return raw;
   }
 }
 
@@ -197,7 +260,7 @@ function normalizeState(input) {
     return {
       id: profile?.id || uid(),
       name: profile?.name || fallbackName,
-      avatar: profile?.avatar || defaultAvatar(profile?.name || fallbackName),
+      avatar: normalizeAvatarValue(profile?.avatar, profile?.name || fallbackName),
       library: [],
       favorites: Array.isArray(profile?.favorites) ? profile.favorites : [],
     };
@@ -225,6 +288,103 @@ function saveState() {
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(storedState));
   localStorage.removeItem(LEGACY_STORAGE_KEY);
+}
+
+function buildProfileSyncPayload() {
+  return {
+    profiles: state.profiles.slice(0, 4).map((profile, index) => ({
+      name: toText(profile.name) || `Perfil ${index + 1}`,
+      avatar: normalizeAvatarValue(profile.avatar, profile.name),
+      favorites: Array.isArray(profile.favorites) ? Array.from(new Set(profile.favorites)).slice(0, 1000) : [],
+    })),
+  };
+}
+
+function sameList(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  return left.every((item, index) => item === right[index]);
+}
+
+function applyProfileSyncPayload(payload) {
+  const remoteProfiles = Array.isArray(payload?.profiles) ? payload.profiles : [];
+  if (!remoteProfiles.length) return false;
+
+  let changed = false;
+  state.profiles.forEach((profile, index) => {
+    const remote = remoteProfiles[index];
+    if (!remote) return;
+
+    const remoteName = toText(remote.name);
+    if (remoteName && remoteName !== profile.name) {
+      profile.name = remoteName;
+      changed = true;
+    }
+
+    if (typeof remote.avatar === "string" && remote.avatar) {
+      const remoteAvatar = normalizeAvatarValue(remote.avatar, profile.name);
+      if (remoteAvatar !== profile.avatar) {
+        profile.avatar = remoteAvatar;
+        changed = true;
+      }
+    } else if (isLegacyGeneratedAvatar(profile.avatar)) {
+      profile.avatar = defaultAvatar(profile.name);
+      changed = true;
+    }
+
+    if (Array.isArray(remote.favorites)) {
+      const remoteFavorites = Array.from(new Set(remote.favorites.map((item) => String(item || "")).filter(Boolean)));
+      if (!sameList(remoteFavorites, profile.favorites)) {
+        profile.favorites = remoteFavorites;
+        changed = true;
+      }
+    }
+  });
+
+  return changed;
+}
+
+async function loadProfileSync() {
+  try {
+    const response = await fetch(PROFILE_SYNC_ENDPOINT, { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json();
+    if (applyProfileSyncPayload(payload)) {
+      saveState();
+      render();
+    }
+  } catch {}
+}
+
+async function saveProfileSync() {
+  clearTimeout(profileSyncTimer);
+  profileSyncTimer = null;
+  if (profileSyncBusy) {
+    profileSyncPending = true;
+    return;
+  }
+
+  profileSyncBusy = true;
+  try {
+    await fetch(PROFILE_SYNC_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildProfileSyncPayload()),
+    });
+  } catch {
+  } finally {
+    profileSyncBusy = false;
+    if (profileSyncPending) {
+      profileSyncPending = false;
+      queueProfileSync(300);
+    }
+  }
+}
+
+function queueProfileSync(delay = PROFILE_SYNC_DEBOUNCE_MS) {
+  clearTimeout(profileSyncTimer);
+  profileSyncTimer = setTimeout(() => {
+    saveProfileSync();
+  }, delay);
 }
 
 function getActiveProfile() {
@@ -505,16 +665,17 @@ function getVisibleItems(profile) {
   const library = getCurrentLibrary(profile);
   const query = normalizeText(searchTerm);
   if (!query) return [];
+  const tab = activeTab === "favorites" ? "all" : activeTab;
 
   return library.filter((item) => {
     const haystack = normalizeText(`${item.title} ${item.group} ${item.type} ${item.source || ""}`);
     const matchesSearch = haystack.includes(query);
     const isFavorite = profile.favorites.includes(item.id);
     const matchesTab =
-      activeTab === "all" ||
-      (activeTab === "favorites" && isFavorite) ||
-      (activeTab === "movies" && item.type === "movie") ||
-      (activeTab === "series" && item.type === "series");
+      tab === "all" ||
+      (tab === "favorites" && isFavorite) ||
+      (tab === "movies" && item.type === "movie") ||
+      (tab === "series" && item.type === "series");
     return matchesSearch && matchesTab && matchesGroupFilter(item);
   });
 }
@@ -526,7 +687,11 @@ function setStatus(message, tone = "info") {
 }
 
 function renderAvatar(profile) {
-  return profile.avatar || defaultAvatar(profile.name);
+  return normalizeAvatarValue(profile.avatar, profile.name);
+}
+
+function getProfileMeta(profile) {
+  return profile.library.length > 0 ? "Catalogo carregado" : "Catalogo em espera";
 }
 
 function buildGroupOptions(profile) {
@@ -1239,6 +1404,7 @@ function render() {
   const seriesCount = library.filter((item) => item.type === "series").length;
   const query = normalizeText(searchTerm);
   const hasQuery = query.length > 0;
+  const titleTab = hasQuery && activeTab === "favorites" ? "all" : activeTab;
   const selected =
     library.find((item) => item.id === selectedItemId) ||
     (activePlayback && activePlayback.profileId === profile.id ? activePlayback : null);
@@ -1249,7 +1415,7 @@ function render() {
   }
   if (els.activeName) els.activeName.textContent = profile.name;
   if (els.activeMeta) {
-    els.activeMeta.textContent = profile.library.length > 0 ? `${profile.library.length} titulos carregados` : "Catálogo em espera";
+    els.activeMeta.textContent = getProfileMeta(profile);
   }
 
   if (els.profileGrid) {
@@ -1274,11 +1440,11 @@ function render() {
   if (els.libraryTitle) {
     els.libraryTitle.textContent =
       hasQuery
-        ? activeTab === "all"
+        ? titleTab === "all"
           ? "Resultados da busca"
-          : activeTab === "movies"
+          : titleTab === "movies"
             ? "Filmes encontrados"
-            : activeTab === "series"
+            : titleTab === "series"
               ? "Series encontradas"
               : "Favoritos encontrados"
         : "Pesquise para ver resultados";
@@ -1303,7 +1469,7 @@ function render() {
     els.activeAvatar.src = renderAvatar(profile);
   }
   if (els.activeMeta) {
-    els.activeMeta.textContent = profile.library.length > 0 ? `${profile.library.length} titulos carregados` : "Catálogo em espera";
+    els.activeMeta.textContent = getProfileMeta(profile);
   }
 
   updateHero(profile, selected);
@@ -1346,6 +1512,7 @@ els.newProfileForm?.addEventListener("submit", (event) => {
   els.newProfileName.value = "";
   setStatus(`Perfil "${name}" criado.`);
   rerender();
+  queueProfileSync();
 });
 
 els.avatarInput?.addEventListener("change", async () => {
@@ -1353,17 +1520,13 @@ els.avatarInput?.addEventListener("change", async () => {
   if (!file) return;
   const profile = getActiveProfile();
   try {
-    profile.avatar = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || defaultAvatar(profile.name)));
-      reader.onerror = () => resolve(defaultAvatar(profile.name));
-      reader.readAsDataURL(file);
-    });
+    profile.avatar = await fileToAvatarDataUrl(file, profile.name);
   } catch {
     profile.avatar = defaultAvatar(profile.name);
   }
   setStatus("Foto do perfil atualizada.");
   rerender();
+  queueProfileSync();
   els.avatarInput.value = "";
 });
 
@@ -1395,16 +1558,12 @@ els.profileEditForm?.addEventListener("submit", async (event) => {
 
   const file = els.editProfileAvatar?.files?.[0];
   if (file) {
-    profile.avatar = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || defaultAvatar(profile.name)));
-      reader.onerror = () => resolve(defaultAvatar(profile.name));
-      reader.readAsDataURL(file);
-    });
+    profile.avatar = await fileToAvatarDataUrl(file, profile.name);
   }
 
   closeProfileEditor();
   rerender();
+  queueProfileSync();
 });
 
 els.editProfileAvatar?.addEventListener("change", async () => {
@@ -1415,12 +1574,7 @@ els.editProfileAvatar?.addEventListener("change", async () => {
     els.editProfileAvatarPreview.src = renderAvatar(profile);
     return;
   }
-  els.editProfileAvatarPreview.src = await new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || defaultAvatar(profile.name)));
-    reader.onerror = () => resolve(defaultAvatar(profile.name));
-    reader.readAsDataURL(file);
-  });
+  els.editProfileAvatarPreview.src = await fileToAvatarDataUrl(file, profile.name);
 });
 
 els.tabs?.addEventListener("click", (event) => {
@@ -1432,6 +1586,9 @@ els.tabs?.addEventListener("click", (event) => {
 
 els.searchInput?.addEventListener("input", () => {
   searchTerm = els.searchInput.value;
+  if (searchTerm.trim()) {
+    activeTab = "all";
+  }
   render();
 });
 
@@ -1507,6 +1664,7 @@ function handleMediaGridClick(event) {
       profile.favorites.push(itemId);
     }
     rerender();
+    queueProfileSync();
     return;
   }
 
@@ -1622,7 +1780,14 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
     clearTimeout(playbackSaveTimer);
     saveActivePlaybackProgress();
+  } else if (!els.profileModal?.open) {
+    loadProfileSync();
   }
+});
+
+window.addEventListener("focus", () => {
+  if (els.profileModal?.open) return;
+  loadProfileSync();
 });
 
 document.addEventListener("click", (event) => {
@@ -1732,5 +1897,8 @@ async function bootstrapLibrary() {
   }
 }
 
+saveState();
 render();
-bootstrapLibrary();
+loadProfileSync().finally(() => {
+  bootstrapLibrary();
+});

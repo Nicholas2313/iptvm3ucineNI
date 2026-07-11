@@ -1,5 +1,5 @@
 import http from "node:http";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,6 +14,7 @@ const xtreamPassword = process.env.XTREAM_PASSWORD || "91170499";
 const maxTotalLibraryItems = Number(process.env.MAX_TOTAL_LIBRARY_ITEMS || 20000);
 const maxMovieItems = Number(process.env.MAX_MOVIE_ITEMS || 20000);
 const maxSeriesItems = Number(process.env.MAX_SERIES_ITEMS || 10000);
+const profileStateFile = process.env.PROFILE_STATE_FILE || path.join(root, "..", ".m3ucine-profile-state.json");
 const xtreamBases = (
   process.env.XTREAM_BASE_URLS ||
   ["http://ph1.fun", "http://topcar123.com.br", "http://phspr.pro"].join("|")
@@ -51,10 +52,65 @@ const types = new Map([
 function send(res, status, body, headers = {}) {
   res.writeHead(status, {
     "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
     "Cache-Control": "no-store",
     ...headers,
   });
   res.end(body);
+}
+
+function emptyProfileState() {
+  return { profiles: [], updatedAt: 0 };
+}
+
+function sanitizeProfileState(input) {
+  const sourceProfiles = Array.isArray(input?.profiles) ? input.profiles : [];
+  const profiles = Array.from({ length: 4 }, (_, index) => {
+    const profile = sourceProfiles[index] || {};
+    const name = String(profile.name || `Perfil ${index + 1}`).trim().slice(0, 24);
+    const avatar = typeof profile.avatar === "string" && profile.avatar.startsWith("data:image/")
+      ? profile.avatar.slice(0, 1800000)
+      : "";
+    const favorites = Array.isArray(profile.favorites)
+      ? Array.from(new Set(profile.favorites.map((item) => String(item || "").trim()).filter(Boolean))).slice(0, 1000)
+      : [];
+
+    return { name, avatar, favorites };
+  });
+
+  return { profiles, updatedAt: Date.now() };
+}
+
+async function readRequestBody(req, maxBytes = 4500000) {
+  const chunks = [];
+  let total = 0;
+
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > maxBytes) {
+      throw new Error("Payload too large");
+    }
+    chunks.push(chunk);
+  }
+
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+async function loadProfileState() {
+  try {
+    const raw = await readFile(profileStateFile, "utf8");
+    return sanitizeProfileState(JSON.parse(raw));
+  } catch {
+    return emptyProfileState();
+  }
+}
+
+async function saveProfileState(input) {
+  const sanitized = sanitizeProfileState(input);
+  await mkdir(path.dirname(profileStateFile), { recursive: true });
+  await writeFile(profileStateFile, JSON.stringify(sanitized), "utf8");
+  return sanitized;
 }
 
 function contentTypeFor(filePath) {
@@ -400,6 +456,28 @@ async function fetchFirstWorkingSeriesInfo(seriesId, baseHint) {
 const server = http.createServer(async (req, res) => {
   try {
     const requestUrl = new URL(req.url, `http://${req.headers.host}`);
+
+    if (req.method === "OPTIONS") {
+      return send(res, 204, "");
+    }
+
+    if (requestUrl.pathname === "/api/profile-state") {
+      if (req.method === "GET") {
+        return send(res, 200, JSON.stringify(await loadProfileState()), {
+          "Content-Type": "application/json; charset=utf-8",
+        });
+      }
+
+      if (req.method === "POST") {
+        const body = await readRequestBody(req);
+        const payload = body ? JSON.parse(body) : {};
+        return send(res, 200, JSON.stringify(await saveProfileState(payload)), {
+          "Content-Type": "application/json; charset=utf-8",
+        });
+      }
+
+      return send(res, 405, "Method not allowed");
+    }
 
     if (requestUrl.pathname === "/api/default-m3u" || requestUrl.pathname === "/api/fetch-m3u") {
       const targets =
