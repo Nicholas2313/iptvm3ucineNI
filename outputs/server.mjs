@@ -29,28 +29,6 @@ const defaultM3uUrls = (
   .split("|")
   .map((url) => url.trim())
   .filter(Boolean);
-const requestedCatalogTargets = [
-  {
-    type: "movie",
-    aliases: ["homem aranha 3", "homem-aranha 3", "spider man 3", "spider-man 3", "spiderman 3"],
-    preferred: ["2007", "tobey", "maguire"],
-  },
-  {
-    type: "series",
-    aliases: ["breaking bad"],
-    preferred: [],
-  },
-  {
-    type: "series",
-    aliases: ["daryl dixon", "the walking dead daryl dixon", "twd daryl dixon"],
-    preferred: [],
-  },
-  {
-    type: "movie",
-    aliases: ["initial d third stage", "initial d 3rd stage", "initial d terceira fase", "initial d third stage dublado"],
-    preferred: ["dublado", "dub", "dual audio"],
-  },
-];
 
 const types = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -127,51 +105,6 @@ async function fetchFirstWorkingM3u(targets) {
   }
 
   return { response: null, target: null, errors };
-}
-
-function normalizeText(value) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
-
-function scoreRequestedMatch(rawItem, target) {
-  const title = normalizeText(rawItem.name || rawItem.title || "");
-  const category = normalizeText(rawItem.category_name || rawItem.categoryName || "");
-  const haystack = `${title} ${category}`;
-  if (!target.aliases.some((alias) => haystack.includes(normalizeText(alias)))) return -1;
-
-  const exactScore = target.aliases.some((alias) => title === normalizeText(alias)) ? 100 : 0;
-  const preferredScore = target.preferred.filter((term) => haystack.includes(normalizeText(term))).length * 10;
-  const dubbedPenalty =
-    target.preferred.some((term) => normalizeText(term).includes("dub")) &&
-    !haystack.includes("dublado") &&
-    !haystack.includes("dub")
-      ? -5
-      : 0;
-
-  return exactScore + preferredScore + dubbedPenalty;
-}
-
-function pickRequestedRawItems(rawItems, type) {
-  const matches = [];
-  const usedIds = new Set();
-
-  for (const target of requestedCatalogTargets.filter((item) => item.type === type)) {
-    const best = rawItems
-      .map((item) => ({ item, score: scoreRequestedMatch(item, target) }))
-      .filter((entry) => entry.score >= 0)
-      .sort((a, b) => b.score - a.score || String(a.item.name || "").localeCompare(String(b.item.name || "")))[0];
-
-    const rawId = String(best?.item?.stream_id || best?.item?.series_id || best?.item?.id || best?.item?.name || "");
-    if (best && rawId && !usedIds.has(rawId)) {
-      usedIds.add(rawId);
-      matches.push(best.item);
-    }
-  }
-
-  return matches;
 }
 
 function uniqueById(items) {
@@ -398,14 +331,12 @@ async function fetchXtreamLibraryFromBase(base) {
   const items = [];
 
   if (Array.isArray(movies)) {
-    const requestedMovies = pickRequestedRawItems(movies, "movie");
-    items.push(...uniqueById([...requestedMovies, ...movies.slice(0, 2000)].map((stream) => normalizeMovie(base, stream))));
+    items.push(...uniqueById(movies.slice(0, 2000).map((stream) => normalizeMovie(base, stream))));
   }
 
   if (Array.isArray(series)) {
-    const requestedSeries = pickRequestedRawItems(series, "series");
     items.push(
-      ...uniqueById([...requestedSeries, ...series.slice(0, 2000)].map((show) => normalizeSeriesShow(base, show)))
+      ...uniqueById(series.slice(0, 2000).map((show) => normalizeSeriesShow(base, show)))
     );
   }
 
@@ -421,22 +352,6 @@ async function fetchXtreamLibraryFromBase(base) {
   }
 
   return items;
-}
-
-async function fetchRequestedLibraryFromBase(base) {
-  const auth = `username=${encodeURIComponent(xtreamUser)}&password=${encodeURIComponent(xtreamPassword)}`;
-  const moviesUrl = `${base}/player_api.php?${auth}&action=get_vod_streams`;
-  const seriesUrl = `${base}/player_api.php?${auth}&action=get_series`;
-  const [moviesResult, seriesResult] = await Promise.allSettled([
-    fetchJson(moviesUrl),
-    fetchJson(seriesUrl),
-  ]);
-  const movies = moviesResult.status === "fulfilled" && Array.isArray(moviesResult.value) ? moviesResult.value : [];
-  const series = seriesResult.status === "fulfilled" && Array.isArray(seriesResult.value) ? seriesResult.value : [];
-  return uniqueById([
-    ...pickRequestedRawItems(movies, "movie").map((stream) => normalizeMovie(base, stream)),
-    ...pickRequestedRawItems(series, "series").map((show) => normalizeSeriesShow(base, show)),
-  ]);
 }
 
 async function fetchXtreamSeriesInfoFromBase(base, seriesId) {
@@ -456,24 +371,6 @@ async function fetchFirstWorkingXtreamLibrary() {
         return { items, base };
       }
       errors.push(`${base} -> sem itens`);
-    } catch (error) {
-      errors.push(`${base} -> ${error.message || "falhou"}`);
-    }
-  }
-
-  return { items: [], base: null, errors };
-}
-
-async function fetchFirstWorkingRequestedLibrary() {
-  const errors = [];
-
-  for (const base of xtreamBases) {
-    try {
-      const items = await fetchRequestedLibraryFromBase(base);
-      if (items.length) {
-        return { items, base };
-      }
-      errors.push(`${base} -> sem itens pedidos`);
     } catch (error) {
       errors.push(`${base} -> ${error.message || "falhou"}`);
     }
@@ -526,18 +423,6 @@ const server = http.createServer(async (req, res) => {
       const result = await fetchFirstWorkingXtreamLibrary();
       if (!result.items.length) {
         return send(res, 502, `No Xtream source worked: ${result.errors.join("; ")}`);
-      }
-
-      return send(res, 200, JSON.stringify(result.items), {
-        "Content-Type": "application/json; charset=utf-8",
-        "X-M3UCINE-Source": result.base,
-      });
-    }
-
-    if (requestUrl.pathname === "/api/requested-library") {
-      const result = await fetchFirstWorkingRequestedLibrary();
-      if (!result.items.length) {
-        return send(res, 404, `Requested titles not found: ${result.errors.join("; ")}`);
       }
 
       return send(res, 200, JSON.stringify(result.items), {
