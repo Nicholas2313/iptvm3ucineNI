@@ -13,6 +13,8 @@ const MAX_LIBRARY_ITEMS = 20000;
 const PROFILE_SYNC_ENDPOINT = "/api/profile-state";
 const PROFILE_SYNC_DEBOUNCE_MS = 700;
 const AVATAR_SIZE = 512;
+const SEARCH_RENDER_DELAY_MS = 120;
+const MAX_SEARCH_RESULTS = 96;
 
 const els = {
   activeAvatar: document.getElementById("active-avatar"),
@@ -102,6 +104,7 @@ let profileCatalogLoading = false;
 let profileSyncTimer = null;
 let profileSyncBusy = false;
 let profileSyncPending = false;
+let searchRenderTimer = null;
 let activePlayback = null;
 let playbackRestoreTime = 0;
 let playbackSaveTimer = null;
@@ -115,6 +118,7 @@ let inlineSeriesState = {
 };
 const seriesDetailsCache = new Map();
 const seriesDetailsLoading = new Map();
+const searchIndexCache = new WeakMap();
 let currentSeriesState = {
   open: false,
   loading: false,
@@ -690,6 +694,14 @@ function matchesGroupFilter(item) {
   return activeGroup === "all" || (item.group || "").toLowerCase() === activeGroup.toLowerCase();
 }
 
+function getItemSearchIndex(item) {
+  const cached = searchIndexCache.get(item);
+  if (cached) return cached;
+  const value = normalizeText(`${item.title} ${item.group} ${item.type} ${item.source || ""}`);
+  searchIndexCache.set(item, value);
+  return value;
+}
+
 function getVisibleItems(profile) {
   const library = getCurrentLibrary(profile);
   const query = normalizeText(searchTerm);
@@ -697,7 +709,7 @@ function getVisibleItems(profile) {
   const tab = activeTab === "favorites" ? "all" : activeTab;
 
   return library.filter((item) => {
-    const haystack = normalizeText(`${item.title} ${item.group} ${item.type} ${item.source || ""}`);
+    const haystack = getItemSearchIndex(item);
     const matchesSearch = haystack.includes(query);
     const isFavorite = profile.favorites.includes(item.id);
     const matchesTab =
@@ -881,6 +893,19 @@ function renderEmptyState(profile) {
         <span class="chip">Sem resultados</span>
         <h4>Nada encontrado com esse filtro.</h4>
         <p>Tente mudar a busca ou a categoria.</p>
+      </div>
+    </article>
+  `;
+}
+
+function renderSearchLimitNote(total, shown) {
+  if (total <= shown) return "";
+  return `
+    <article class="media-card wide search-limit-note">
+      <div class="media-info">
+        <span class="chip">Busca otimizada</span>
+        <h4>Mostrando ${shown} de ${total} resultados.</h4>
+        <p>Digite mais letras para encontrar o título mais rápido.</p>
       </div>
     </article>
   `;
@@ -1513,6 +1538,7 @@ function syncTabs() {
 }
 
 function resetHomeView() {
+  window.clearTimeout(searchRenderTimer);
   activeTab = "all";
   activeGroup = "all";
   searchTerm = "";
@@ -1550,6 +1576,17 @@ function scrollCarousel(targetId, direction) {
     behavior: "smooth",
   });
   setTimeout(updateCarouselControls, 260);
+}
+
+function scheduleSearchRender() {
+  window.clearTimeout(searchRenderTimer);
+  searchRenderTimer = window.setTimeout(() => {
+    searchTerm = els.searchInput?.value || "";
+    if (searchTerm.trim()) {
+      activeTab = "all";
+    }
+    render();
+  }, SEARCH_RENDER_DELAY_MS);
 }
 
 function escapeHtml(value) {
@@ -1905,6 +1942,7 @@ function render() {
   const favorites = library.filter((item) => profile.favorites.includes(item.id));
   const continueItems = getProfileContinueItems(profile);
   const visible = getVisibleItems(profile);
+  const visibleForRender = visible.slice(0, MAX_SEARCH_RESULTS);
   const movieCount = library.filter((item) => item.type === "movie").length;
   const seriesCount = library.filter((item) => item.type === "series").length;
   const query = normalizeText(searchTerm);
@@ -2006,7 +2044,7 @@ function render() {
   if (els.libraryGrid) {
     els.libraryGrid.innerHTML = hasQuery
       ? visible.length
-        ? visible.map((item) => renderStreamingCard(item, profile)).join("")
+        ? `${visibleForRender.map((item) => renderStreamingCard(item, profile)).join("")}${renderSearchLimitNote(visible.length, visibleForRender.length)}`
         : renderEmptyState(profile)
       : renderEmptyState(profile);
   }
@@ -2071,6 +2109,7 @@ els.editProfileBtn?.addEventListener("click", () => {
 });
 
 els.exitBtn?.addEventListener("click", () => {
+  window.clearTimeout(searchRenderTimer);
   activeTab = "all";
   searchTerm = "";
   if (els.searchInput) els.searchInput.value = "";
@@ -2141,11 +2180,7 @@ document.querySelectorAll(".carousel-track").forEach((track) => {
 window.addEventListener("resize", () => requestAnimationFrame(updateCarouselControls));
 
 els.searchInput?.addEventListener("input", () => {
-  searchTerm = els.searchInput.value;
-  if (searchTerm.trim()) {
-    activeTab = "all";
-  }
-  render();
+  scheduleSearchRender();
 });
 
 els.groupFilter?.addEventListener("change", () => {
