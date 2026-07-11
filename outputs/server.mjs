@@ -7,10 +7,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = __dirname;
 const port = Number(process.env.PORT || 10000);
-const upstreamTimeoutMs = 5000;
+const upstreamTimeoutMs = Number(process.env.UPSTREAM_TIMEOUT_MS || 15000);
 const appName = process.env.APP_NAME || "M3UCINE";
 const xtreamUser = process.env.XTREAM_USER || "50971241";
 const xtreamPassword = process.env.XTREAM_PASSWORD || "91170499";
+const maxTotalLibraryItems = Number(process.env.MAX_TOTAL_LIBRARY_ITEMS || 20000);
+const maxMovieItems = Number(process.env.MAX_MOVIE_ITEMS || 20000);
+const maxSeriesItems = Number(process.env.MAX_SERIES_ITEMS || 10000);
 const xtreamBases = (
   process.env.XTREAM_BASE_URLS ||
   ["http://ph1.fun", "http://topcar123.com.br", "http://phspr.pro"].join("|")
@@ -329,16 +332,16 @@ async function fetchXtreamLibraryFromBase(base) {
   const movies = moviesResult.status === "fulfilled" ? moviesResult.value : [];
   const series = seriesResult.status === "fulfilled" ? seriesResult.value : [];
   const items = [];
+  const selectedSeries = Array.isArray(series)
+    ? uniqueById(series.slice(0, Math.min(maxSeriesItems, maxTotalLibraryItems)).map((show) => normalizeSeriesShow(base, show)))
+    : [];
+  const movieLimit = Math.max(0, Math.min(maxMovieItems, maxTotalLibraryItems - selectedSeries.length));
 
   if (Array.isArray(movies)) {
-    items.push(...uniqueById(movies.slice(0, 2000).map((stream) => normalizeMovie(base, stream))));
+    items.push(...uniqueById(movies.slice(0, movieLimit).map((stream) => normalizeMovie(base, stream))));
   }
 
-  if (Array.isArray(series)) {
-    items.push(
-      ...uniqueById(series.slice(0, 2000).map((show) => normalizeSeriesShow(base, show)))
-    );
-  }
+  items.push(...selectedSeries);
 
   if (!items.length) {
     throw new Error(

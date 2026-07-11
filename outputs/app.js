@@ -8,6 +8,8 @@ const LAST_M3U_URL_KEY = "m3ucine-last-m3u-url";
 const LEGACY_LAST_M3U_URL_KEY = "calicine-iptv-last-m3u-url";
 const MIN_CONTINUE_SECONDS = 8;
 const PLAYBACK_SAVE_INTERVAL_MS = 1000;
+const LIBRARY_FETCH_TIMEOUT_MS = 45000;
+const MAX_LIBRARY_ITEMS = 20000;
 
 const els = {
   activeAvatar: document.getElementById("active-avatar"),
@@ -197,7 +199,7 @@ function normalizeState(input) {
       id: profile?.id || uid(),
       name: profile?.name || fallbackName,
       avatar: profile?.avatar || defaultAvatar(profile?.name || fallbackName),
-      library: Array.isArray(profile?.library) ? profile.library : [],
+      library: [],
       favorites: Array.isArray(profile?.favorites) ? profile.favorites : [],
     };
   });
@@ -212,7 +214,17 @@ function normalizeState(input) {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const storedState = {
+    activeProfileId: state.activeProfileId,
+    profiles: state.profiles.map((profile) => ({
+      id: profile.id,
+      name: profile.name,
+      avatar: profile.avatar,
+      favorites: profile.favorites,
+      library: [],
+    })),
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(storedState));
   localStorage.removeItem(LEGACY_STORAGE_KEY);
 }
 
@@ -473,7 +485,7 @@ async function fetchTextWithFallback(url) {
 }
 
 function importItemsIntoProfile(profile, items) {
-  profile.library = items;
+  profile.library = items.slice(0, MAX_LIBRARY_ITEMS);
   profile.favorites = profile.favorites.filter((favoriteId) =>
     profile.library.some((item) => item.id === favoriteId)
   );
@@ -1474,7 +1486,7 @@ els.importForm?.addEventListener("submit", async (event) => {
 
     importItemsIntoProfile(profile, items);
     localStorage.setItem(LAST_M3U_URL_KEY, url);
-    setStatus(`${items.length} itens carregados com sucesso.`);
+    setStatus(`${profile.library.length} itens carregados com sucesso.`);
     rerender();
   } catch (error) {
     setStatus(
@@ -1717,17 +1729,17 @@ async function bootstrapLibrary() {
           const items = parseM3U(text);
           if (items.length) {
             importItemsIntoProfile(profile, items);
-            setStatus(`${items.length} itens restaurados automaticamente.`);
+            setStatus(`${profile.library.length} itens restaurados automaticamente.`);
             rerender();
             return;
           }
         } else {
-          const response = await withTimeout(fetch("/api/default-library", { cache: "no-store" }), 15000, "Tempo esgotado");
+          const response = await withTimeout(fetch("/api/default-library", { cache: "no-store" }), LIBRARY_FETCH_TIMEOUT_MS, "Tempo esgotado");
           if (response.ok) {
             const items = await response.json();
             if (Array.isArray(items) && items.length) {
               importItemsIntoProfile(profile, items);
-              setStatus(`${items.length} itens carregados automaticamente.`);
+              setStatus(`${profile.library.length} itens carregados automaticamente.`);
               rerender();
               return;
             }
