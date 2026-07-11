@@ -56,6 +56,7 @@ const els = {
   downloadLink: document.getElementById("download-link"),
   openLink: document.getElementById("open-link"),
   continueGrid: document.getElementById("continue-grid"),
+  requestedGrid: document.getElementById("requested-grid"),
   catalogStatus: document.getElementById("catalog-status"),
   catalogSource: document.getElementById("catalog-source"),
   clearHistory: document.getElementById("clear-history"),
@@ -85,6 +86,34 @@ let currentSeriesState = {
   activeSeason: null,
   selectedEpisodeId: null,
 };
+const requestedCatalogTargets = [
+  {
+    label: "Homem-Aranha 3",
+    type: "movie",
+    aliases: ["homem aranha 3", "homem-aranha 3", "spider man 3", "spider-man 3", "spiderman 3"],
+    preferred: ["2007", "tobey", "maguire"],
+  },
+  {
+    label: "Breaking Bad",
+    type: "series",
+    aliases: ["breaking bad"],
+    preferred: [],
+  },
+  {
+    label: "Daryl Dixon",
+    type: "series",
+    aliases: ["daryl dixon", "the walking dead daryl dixon", "twd daryl dixon"],
+    preferred: [],
+  },
+  {
+    label: "Initial D Third Stage Dublado",
+    type: "movie",
+    aliases: ["initial d third stage", "initial d 3rd stage", "initial d terceira fase", "initial d third stage dublado"],
+    preferred: ["dublado", "dub", "dual audio"],
+  },
+];
+const requestedCatalogProfiles = new Set();
+let requestedCatalogLoading = false;
 
 function uid() {
   return window.crypto?.randomUUID?.() || `id-${Math.random().toString(36).slice(2, 10)}`;
@@ -368,6 +397,100 @@ function normalizeText(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+}
+
+function itemMatchesRequestedTarget(item, target) {
+  if (!item || !target) return false;
+  if (target.type && item.type !== target.type) return false;
+  const haystack = normalizeText(`${item.title} ${item.group} ${item.source || ""}`);
+  return target.aliases.some((alias) => haystack.includes(normalizeText(alias)));
+}
+
+function getRequestedCatalogMatches(profile) {
+  const used = new Set();
+  return requestedCatalogTargets.map((target) => {
+    const matches = profile.library
+      .filter((item) => !used.has(item.id) && itemMatchesRequestedTarget(item, target))
+      .sort((a, b) => {
+        const score = (item) => {
+          const title = normalizeText(item.title);
+          const preferred = target.preferred.filter((term) => title.includes(normalizeText(term))).length;
+          const exact = target.aliases.some((alias) => title === normalizeText(alias)) ? 10 : 0;
+          return exact + preferred;
+        };
+        return score(b) - score(a) || a.title.localeCompare(b.title);
+      });
+    const item = matches[0] || null;
+    if (item) used.add(item.id);
+    return { target, item };
+  });
+}
+
+function getRequestedCatalogItems(profile) {
+  return getRequestedCatalogMatches(profile).map((match) => match.item).filter(Boolean);
+}
+
+function renderRequestedCatalog(profile) {
+  const matches = getRequestedCatalogMatches(profile);
+  const items = matches.map((match) => match.item).filter(Boolean);
+  const missing = matches.filter((match) => !match.item).map((match) => match.target.label);
+  if (items.length) {
+    return [
+      items.map((item) => renderCard(item, profile)).join(""),
+      missing.length
+        ? `<article class="empty-note">Ainda nao encontrei na playlist: ${escapeHtml(missing.join(", "))}.</article>`
+        : "",
+    ].join("");
+  }
+
+  if (!profile.library.length || requestedCatalogLoading) {
+    return `<article class="empty-note">Procurando os titulos pedidos na playlist...</article>`;
+  }
+
+  return `<article class="empty-note">Ainda nao encontrei esses titulos na playlist carregada.</article>`;
+}
+
+function mergeItemsIntoProfile(profile, items) {
+  if (!profile || !Array.isArray(items) || !items.length) return 0;
+  const existingIds = new Set(profile.library.map((item) => item.id));
+  let added = 0;
+
+  for (const item of items) {
+    if (!item?.id || existingIds.has(item.id)) continue;
+    profile.library.push(item);
+    existingIds.add(item.id);
+    added += 1;
+  }
+
+  return added;
+}
+
+async function ensureRequestedCatalogItems(profile) {
+  if (!profile || requestedCatalogLoading || requestedCatalogProfiles.has(profile.id)) return;
+  const alreadyFound = getRequestedCatalogItems(profile).length;
+  if (alreadyFound >= requestedCatalogTargets.length) {
+    requestedCatalogProfiles.add(profile.id);
+    return;
+  }
+
+  requestedCatalogLoading = true;
+  render();
+
+  try {
+    const response = await withTimeout(fetch("/api/requested-library", { cache: "no-store" }), 18000, "Tempo esgotado");
+    if (response.ok) {
+      const items = await response.json();
+      const added = mergeItemsIntoProfile(profile, Array.isArray(items) ? items : []);
+      if (added > 0) {
+        saveState();
+      }
+    }
+  } catch {
+  } finally {
+    requestedCatalogProfiles.add(profile.id);
+    requestedCatalogLoading = false;
+    render();
+  }
 }
 
 function parseAttributes(text) {
@@ -1289,10 +1412,15 @@ function render() {
       : `<article class="empty-note">Nenhum favorito salvo ainda.</article>`;
   }
   if (els.continueGrid) els.continueGrid.innerHTML = renderHistory(profile);
+  if (els.requestedGrid) els.requestedGrid.innerHTML = renderRequestedCatalog(profile);
 
   document.body.classList.toggle("search-mode", hasQuery);
 
   syncTabs();
+
+  if (profile.library.length > 0) {
+    void ensureRequestedCatalogItems(profile);
+  }
 }
 
 function rerender() {
@@ -1408,6 +1536,14 @@ els.groupFilter?.addEventListener("change", () => {
 });
 
 els.clearHistory?.addEventListener("click", () => {
+  const profile = getActiveProfile();
+  clearTimeout(playbackSaveTimer);
+  playbackSaveTimer = null;
+  if (activePlayback?.profileId === profile.id) {
+    activePlayback = null;
+    playbackRestoreTime = 0;
+  }
+  clearPlaybackProgress(profile.id);
   recentHistory.splice(0, recentHistory.length);
   saveHistory();
   render();
@@ -1457,7 +1593,7 @@ els.importForm?.addEventListener("submit", async (event) => {
   }
 });
 
-els.libraryGrid?.addEventListener("click", (event) => {
+function handleMediaGridClick(event) {
   const favoriteButton = event.target.closest("[data-favorite]");
   if (favoriteButton) {
     const profile = getActiveProfile();
@@ -1476,7 +1612,11 @@ els.libraryGrid?.addEventListener("click", (event) => {
   if (card) {
     selectItem(card.dataset.itemId);
   }
-});
+}
+
+els.libraryGrid?.addEventListener("click", handleMediaGridClick);
+els.favoriteGrid?.addEventListener("click", handleMediaGridClick);
+els.requestedGrid?.addEventListener("click", handleMediaGridClick);
 
 els.libraryGrid?.addEventListener("dblclick", (event) => {
   const card = event.target.closest("[data-item-id]");
