@@ -65,6 +65,7 @@ const els = {
   heroDescription: document.getElementById("hero-description"),
   heroContinueBtn: document.getElementById("hero-continue-btn"),
   heroFavoriteBtn: document.getElementById("hero-favorite-btn"),
+  featuredBanner: document.getElementById("featured-banner"),
   featuredTitle: document.getElementById("featured-title"),
   featuredDescription: document.getElementById("featured-description"),
   player: document.getElementById("player"),
@@ -74,7 +75,9 @@ const els = {
   playerSeasonsSection: document.getElementById("player-seasons-section"),
   playerSeasonSelect: document.getElementById("player-season-select"),
   playerEpisodeList: document.getElementById("player-episode-list"),
+  continueSection: document.getElementById("continue-section"),
   continueGrid: document.getElementById("continue-grid"),
+  favoritesSection: document.getElementById("favorites-section"),
   recentGrid: document.getElementById("recent-grid"),
   popularMoviesGrid: document.getElementById("popular-movies-grid"),
   seriesGrid: document.getElementById("series-grid"),
@@ -1601,10 +1604,17 @@ function updateFeaturedBanner(profile) {
     els.featuredTitle.textContent = "Sua biblioteca cinematografica";
     els.featuredDescription.textContent =
       "Pesquise, continue de onde parou e encontre filmes, series e animes em uma interface feita para maratonar.";
+    els.featuredBanner?.style.removeProperty("--featured-image");
     return;
   }
   els.featuredTitle.textContent = getHeroTitle(featured);
   els.featuredDescription.textContent = getHeroDescription(featured);
+  if (els.featuredBanner && featured.logo) {
+    const safeUrl = String(featured.logo).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    els.featuredBanner.style.setProperty("--featured-image", `url("${safeUrl}")`);
+  } else {
+    els.featuredBanner?.style.removeProperty("--featured-image");
+  }
 }
 
 function updateHomeRails(profile) {
@@ -1853,6 +1863,7 @@ function render() {
   const profile = getActiveProfile();
   const library = profile.library;
   const favorites = library.filter((item) => profile.favorites.includes(item.id));
+  const continueItems = getProfileContinueItems(profile);
   const visible = getVisibleItems(profile);
   const movieCount = library.filter((item) => item.type === "movie").length;
   const seriesCount = library.filter((item) => item.type === "series").length;
@@ -1964,7 +1975,9 @@ function render() {
       ? favorites.map((item) => renderStreamingCard(item, profile)).join("")
       : `<article class="empty-note">Nenhum favorito salvo ainda.</article>`;
   }
+  els.favoritesSection?.classList.toggle("is-empty", favorites.length === 0);
   if (els.continueGrid) els.continueGrid.innerHTML = renderHistory(profile);
+  els.continueSection?.classList.toggle("is-empty", continueItems.length === 0);
 
   document.body.classList.toggle("search-mode", hasQuery);
 
