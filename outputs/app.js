@@ -33,7 +33,6 @@ const els = {
   seriesSeasonTabs: document.getElementById("series-season-tabs"),
   seriesEpisodeGrid: document.getElementById("series-episode-grid"),
   seriesModalStatus: document.getElementById("series-modal-status"),
-  playFirstEpisode: document.getElementById("play-first-episode"),
   avatarInput: document.getElementById("avatar-input"),
   newProfileForm: document.getElementById("new-profile-form"),
   newProfileName: document.getElementById("new-profile-name"),
@@ -975,9 +974,6 @@ function renderSeriesDetailsLegacy() {
       : `<article class="empty-note">Nenhum episódio encontrado nesta temporada.</article>`;
   }
 
-  if (els.playFirstEpisode) {
-    els.playFirstEpisode.disabled = !(activeSeason?.episodes?.length);
-  }
 }
 
 function renderSeriesDetails() {
@@ -1025,14 +1021,11 @@ function renderSeriesDetails() {
   }
 
   if (els.seriesEpisodeGrid) {
-    els.seriesEpisodeGrid.innerHTML = seasons.length
-      ? seasons.map((season) => renderSeasonSection(season, state)).join("")
+    els.seriesEpisodeGrid.innerHTML = activeSeason
+      ? renderSeasonSection(activeSeason, state)
       : `<article class="empty-note">Nenhum episodio encontrado nesta serie.</article>`;
   }
 
-  if (els.playFirstEpisode) {
-    els.playFirstEpisode.disabled = !(activeSeason?.episodes?.length);
-  }
 }
 
 async function loadSeriesDetails(seriesItem, force = false) {
@@ -1662,10 +1655,6 @@ els.seriesSeasonTabs?.addEventListener("click", (event) => {
   if (!Number.isFinite(seasonNumber)) return;
   currentSeriesState = { ...currentSeriesState, activeSeason: seasonNumber, selectedEpisodeId: null };
   renderSeriesDetails();
-  requestAnimationFrame(() => {
-    const target = els.seriesEpisodeGrid?.querySelector(`[data-season-block="${seasonNumber}"]`);
-    target?.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
 });
 
 els.seriesEpisodeGrid?.addEventListener("click", (event) => {
@@ -1687,16 +1676,6 @@ els.seriesEpisodeGrid?.addEventListener("click", (event) => {
   openSeriesEpisode(profile, found.episode, series, {
     startTime: queueButton ? saved?.currentTime || 0 : 0,
   });
-});
-
-els.playFirstEpisode?.addEventListener("click", () => {
-  const seriesDetails = currentSeriesState.details;
-  const series = currentSeriesState.series;
-  const activeSeason = seriesDetails?.seasons?.find((season) => season.seasonNumber === currentSeriesState.activeSeason) || seriesDetails?.seasons?.[0];
-  const firstEpisode = activeSeason?.episodes?.[0];
-  if (!firstEpisode || !series) return;
-  const profile = getActiveProfile();
-  openSeriesEpisode(profile, firstEpisode, series, { startTime: 0 });
 });
 
 document.addEventListener("keydown", (event) => {
