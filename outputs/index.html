@@ -5,12 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>M3UCINE</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="./styles.css" />
     <script defer src="./app.js"></script>
   </head>
@@ -28,11 +22,11 @@
           <button class="install-btn primary-btn" type="button">Instalar app</button>
           <div class="profile-menu">
             <button id="profile-menu-btn" class="profile-menu-btn" type="button" aria-haspopup="true" aria-expanded="false">
-              <img id="active-avatar" class="profile-avatar" alt="Foto de perfil ativa" />
+              <img id="active-avatar" class="profile-avatar" alt="Foto de perfil ativa" width="48" height="48" />
             </button>
             <div id="profile-menu-panel" class="profile-menu-panel" hidden>
               <div class="profile-menu-head">
-                <img id="menu-avatar" class="profile-avatar menu-avatar" alt="Foto de perfil" />
+                <img id="menu-avatar" class="profile-avatar menu-avatar" alt="Foto de perfil" width="52" height="52" />
                 <div>
                   <strong id="active-name">Perfil 1</strong>
                   <small id="active-meta">Catálogo em espera</small>
@@ -278,7 +272,7 @@
     <dialog id="series-modal" class="series-modal">
       <form method="dialog" class="series-modal-card">
         <div class="series-modal-hero">
-          <img id="series-modal-poster" alt="Pôster da série" class="series-modal-poster" />
+          <img id="series-modal-poster" alt="Pôster da série" class="series-modal-poster" width="170" height="255" />
           <div class="series-modal-copy">
             <div class="series-modal-head">
               <div>
@@ -330,7 +324,7 @@
         </label>
 
         <div class="profile-modal-preview">
-          <img id="edit-profile-avatar-preview" alt="Pré-visualização do perfil" />
+          <img id="edit-profile-avatar-preview" alt="Pré-visualização do perfil" width="154" height="154" />
         </div>
 
         <div class="profile-modal-actions">

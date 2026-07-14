@@ -2,6 +2,10 @@
   color-scheme: dark;
   --bg: #020916;
   --bg-soft: #061329;
+  --app-bg: #020812;
+  --panel: #07152b;
+  --panel-strong: #081c38;
+  --panel-soft: rgba(7, 19, 39, 0.78);
   --surface: rgba(7, 18, 37, 0.74);
   --surface-strong: rgba(8, 24, 50, 0.9);
   --surface-card: #081a36;
@@ -16,13 +20,17 @@
   --muted-2: #71849f;
   --line: rgba(90, 188, 255, 0.18);
   --line-strong: rgba(99, 199, 255, 0.36);
+  --border-soft: rgba(95, 186, 255, 0.16);
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.42), 0 0 38px rgba(22, 140, 255, 0.12);
   --shadow-card: 0 18px 36px rgba(0, 0, 0, 0.32), 0 0 22px rgba(22, 140, 255, 0.08);
+  --shadow-soft: 0 18px 44px rgba(0, 0, 0, 0.3);
+  --content-max: 1480px;
+  --button-height: 42px;
   --radius-xl: 28px;
   --radius-lg: 22px;
   --radius-md: 16px;
   --radius-sm: 12px;
-  --ease: 180ms ease;
+  --ease: 150ms ease;
 }
 
 *,
@@ -50,7 +58,7 @@ body {
     radial-gradient(circle at 18% -8%, rgba(42, 203, 255, 0.22), transparent 34rem),
     radial-gradient(circle at 88% 10%, rgba(6, 93, 255, 0.2), transparent 32rem),
     linear-gradient(180deg, #061833 0%, #030b18 42%, #020711 100%);
-  font-family: "Manrope", "Inter", "Segoe UI", sans-serif;
+  font-family: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
   overflow-x: hidden;
 }
 
@@ -119,9 +127,8 @@ video {
   padding: 14px 18px;
   border: 1px solid rgba(99, 199, 255, 0.16);
   border-radius: 0 0 18px 18px;
-  background: rgba(3, 11, 24, 0.76);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(22px);
+  background: rgba(3, 11, 24, 0.94);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
 
 .brand-wrap,
@@ -151,7 +158,7 @@ video {
   gap: 12px;
   color: var(--text);
   text-decoration: none;
-  font-family: "Bebas Neue", "Manrope", sans-serif;
+  font-family: "Arial Narrow", Impact, "Segoe UI", sans-serif;
   font-size: clamp(1.65rem, 2.4vw, 2.35rem);
   letter-spacing: 0.02em;
   line-height: 0.9;
@@ -260,7 +267,7 @@ video {
   text-decoration: none;
   appearance: none;
   -webkit-appearance: none;
-  transition: transform var(--ease), box-shadow var(--ease), background var(--ease), border-color var(--ease), opacity var(--ease);
+  transition: transform var(--ease), box-shadow var(--ease), background-color var(--ease), background var(--ease), border-color var(--ease), opacity var(--ease);
 }
 
 .tab,
@@ -284,7 +291,7 @@ video {
 .tab,
 .ghost-btn,
 .primary-btn {
-  min-height: 46px;
+  min-height: var(--button-height);
   padding: 0 18px;
   display: inline-flex;
   align-items: center;
@@ -300,7 +307,7 @@ video {
 .episode-play-btn:hover,
 .menu-item:hover,
 .profile-menu-btn:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28), 0 0 28px rgba(66, 215, 255, 0.18);
 }
 
@@ -486,7 +493,6 @@ body.profile-gate .content > :not(.profile-hero) {
   right: -12%;
   bottom: 10%;
   background: radial-gradient(ellipse, rgba(66, 215, 255, 0.13), transparent 68%);
-  filter: blur(14px);
 }
 
 body:not(.profile-gate) .profile-hero {
@@ -610,7 +616,6 @@ body:not(.profile-gate) .profile-hero {
   height: 48%;
   background: radial-gradient(circle, color-mix(in srgb, var(--profile-accent) 18%, transparent), transparent 64%);
   opacity: 0.58;
-  filter: blur(18px);
 }
 
 .profile-card:hover,
@@ -774,7 +779,6 @@ body:not(.profile-gate) .profile-hero {
   width: min(70%, 900px);
   height: 72%;
   background: radial-gradient(circle, rgba(66, 215, 255, 0.16), transparent 62%);
-  filter: blur(12px);
 }
 
 .featured-content {
@@ -1405,7 +1409,6 @@ dialog {
 
 dialog::backdrop {
   background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(10px);
 }
 
 .profile-modal-card,
@@ -1515,7 +1518,8 @@ dialog::backdrop {
 
 body:not(.profile-gate) {
   background:
-    linear-gradient(180deg, #071222 0%, #050c18 42%, #020711 100%);
+    radial-gradient(circle at 22% -8%, rgba(22, 140, 255, 0.16), transparent 30rem),
+    linear-gradient(180deg, var(--app-bg) 0%, #030b18 54%, #020611 100%);
 }
 
 body:not(.profile-gate) .page-shell {
@@ -1526,30 +1530,40 @@ body:not(.profile-gate) .topbar {
   position: sticky;
   top: 0;
   z-index: 100;
-  gap: 18px;
-  padding: 12px 20px;
+  gap: clamp(10px, 1.6vw, 18px);
+  min-height: 64px;
+  padding: 9px clamp(12px, 2vw, 24px);
   border-width: 0 0 1px;
+  border-color: rgba(86, 177, 255, 0.14);
   border-radius: 0;
-  background: rgba(6, 12, 24, 0.96);
-  box-shadow: none;
+  background: #04101f;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
 body:not(.profile-gate) .brand {
-  font-size: clamp(1.7rem, 2.1vw, 2.2rem);
+  font-size: clamp(1.65rem, 2vw, 2.18rem);
+}
+
+body:not(.profile-gate) .brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
 }
 
 body:not(.profile-gate) .top-actions {
   margin-left: auto;
+  gap: 10px;
+  min-width: 0;
 }
 
 body:not(.profile-gate) .profile-menu-btn {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 14px;
 }
 
 body:not(.profile-gate) .quick-exit-btn {
-  min-width: 96px;
+  min-width: 86px;
 }
 
 body:not(.profile-gate) .content {
@@ -1566,30 +1580,38 @@ body:not(.profile-gate) .similar-section {
 
 body:not(.profile-gate) .player-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
-  gap: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: 14px;
+  width: min(100%, var(--content-max));
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding: 14px;
   overflow: hidden;
-  border: 1px solid rgba(44, 115, 196, 0.38);
-  border-radius: 0 0 18px 18px;
-  background: #070d18;
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(8, 23, 45, 0.92), rgba(4, 11, 22, 0.96));
+  box-shadow: var(--shadow-soft);
 }
 
 body:not(.profile-gate) .hero-panel {
-  border-radius: 0;
-  background: #050a13;
-  box-shadow: none;
+  border: 1px solid rgba(86, 177, 255, 0.13);
+  border-radius: 16px;
+  background: #050b15;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
 }
 
 body:not(.profile-gate) .hero-stage {
-  min-height: clamp(360px, 52vh, 560px);
-  aspect-ratio: auto;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  max-height: min(62vh, 640px);
   background:
     repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 18px),
     #060b14;
 }
 
 body:not(.profile-gate) .video-player {
-  min-height: inherit;
+  min-height: 0;
+  max-height: min(62vh, 640px);
 }
 
 body:not(.profile-gate) .player-empty {
@@ -1598,13 +1620,15 @@ body:not(.profile-gate) .player-empty {
 
 body:not(.profile-gate) .hero-footer {
   grid-template-columns: minmax(0, 1fr) auto;
-  padding: 18px;
-  background: #071225;
-  border-top: 1px solid rgba(44, 115, 196, 0.28);
+  gap: 16px;
+  padding: clamp(16px, 2vw, 24px);
+  background: linear-gradient(180deg, #07162b, #061020);
+  border-top: 1px solid rgba(86, 177, 255, 0.13);
 }
 
 body:not(.profile-gate) .hero-copy h1 {
-  font-size: clamp(2rem, 3.4vw, 3.2rem);
+  font-size: clamp(1.55rem, 3vw, 2.75rem);
+  line-height: 1.04;
 }
 
 body:not(.profile-gate) .hero-copy p,
@@ -1614,37 +1638,60 @@ body:not(.profile-gate) #hero-episode-title {
 
 .catalog-side-panel {
   display: grid;
-  align-content: center;
-  gap: 14px;
+  align-self: start;
+  align-content: start;
+  gap: 10px;
   min-width: 0;
-  padding: clamp(22px, 3vw, 36px);
-  border-left: 1px solid rgba(44, 115, 196, 0.42);
+  padding: clamp(16px, 2vw, 22px);
+  border: 1px solid rgba(86, 177, 255, 0.13);
+  border-radius: 16px;
   background:
-    radial-gradient(circle at 100% 0%, rgba(83, 59, 156, 0.18), transparent 26rem),
-    linear-gradient(180deg, #151524, #0c0e19);
+    radial-gradient(circle at 100% 0%, rgba(22, 140, 255, 0.13), transparent 18rem),
+    linear-gradient(180deg, var(--panel), #050d1a);
 }
 
 .catalog-side-panel .catalog-pill {
   display: inline-flex;
   width: fit-content;
   min-width: 0;
-  border-color: rgba(255, 177, 73, 0.42);
+  padding: 7px 11px;
+  border-color: rgba(49, 240, 162, 0.26);
+  background: rgba(7, 29, 46, 0.72);
 }
 
 .catalog-side-panel h2 {
-  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 2px 0 0;
   color: var(--text);
-  font-size: clamp(1.55rem, 2.2vw, 2.1rem);
+  font-size: clamp(1.18rem, 1.7vw, 1.55rem);
+  line-height: 1.1;
+}
+
+.catalog-side-panel h2::before {
+  content: "\25CF";
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--green);
+  background: rgba(49, 240, 162, 0.1);
+  border: 1px solid rgba(49, 240, 162, 0.2);
+  font-size: 0.72rem;
 }
 
 .catalog-side-panel p {
   margin: 0;
   color: #c6dcff;
-  line-height: 1.55;
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 
 .catalog-side-panel strong {
   color: #84ff9f;
+  font-weight: 800;
 }
 
 body:not(.profile-gate) .filter-strip {
@@ -1652,10 +1699,13 @@ body:not(.profile-gate) .filter-strip {
   grid-template-columns: auto minmax(220px, 1fr) minmax(190px, 260px);
   align-items: end;
   gap: 12px;
+  width: min(100%, var(--content-max));
+  max-width: var(--content-max);
+  margin-inline: auto;
   padding: 14px;
-  border: 1px solid rgba(44, 115, 196, 0.38);
+  border: 1px solid var(--border-soft);
   border-radius: 16px;
-  background: rgba(6, 13, 26, 0.92);
+  background: var(--panel-soft);
 }
 
 body:not(.profile-gate) .filter-strip .main-nav {
@@ -1686,10 +1736,13 @@ body:not(.profile-gate) .filter-strip select {
 
 body:not(.profile-gate) .rail-section,
 body:not(.profile-gate) .player-seasons-section {
-  border-color: rgba(44, 115, 196, 0.36);
+  width: min(100%, var(--content-max));
+  max-width: var(--content-max);
+  margin-inline: auto;
+  border-color: var(--border-soft);
   border-radius: 16px;
-  background: rgba(6, 13, 26, 0.9);
-  box-shadow: none;
+  background: rgba(6, 16, 31, 0.9);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
 }
 
 body:not(.profile-gate) .section-head h2 {
@@ -1698,9 +1751,33 @@ body:not(.profile-gate) .section-head h2 {
 
 body:not(.profile-gate) .media-card,
 body:not(.profile-gate) .continue-card {
-  background: #0b1830;
-  border-color: rgba(76, 150, 240, 0.24);
-  box-shadow: none;
+  background: linear-gradient(180deg, #0a1b36, #061326);
+  border-color: rgba(76, 150, 240, 0.18);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+}
+
+body:not(.profile-gate) .media-card:hover,
+body:not(.profile-gate) .continue-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(66, 215, 255, 0.34);
+}
+
+body:not(.profile-gate) .tab,
+body:not(.profile-gate) .ghost-btn,
+body:not(.profile-gate) .primary-btn,
+body:not(.profile-gate) .small-btn,
+body:not(.profile-gate) .card-button,
+body:not(.profile-gate) .episode-play-btn {
+  border-radius: 12px;
+}
+
+body:not(.profile-gate) .primary-btn,
+body:not(.profile-gate) .tab.active,
+body:not(.profile-gate) .card-button.play-button,
+body:not(.profile-gate) .small-btn.play-button,
+body:not(.profile-gate) .episode-play-btn {
+  background: linear-gradient(135deg, #209cff, #0868e9);
+  box-shadow: 0 8px 18px rgba(8, 104, 233, 0.24);
 }
 
 @media (max-width: 1180px) {
@@ -1828,8 +1905,8 @@ body:not(.profile-gate) .continue-card {
   }
 
   body:not(.profile-gate) .catalog-side-panel {
-    border-left: 0;
-    border-top: 1px solid rgba(44, 115, 196, 0.42);
+    width: 100%;
+    border: 1px solid var(--border-soft);
     align-content: start;
   }
 
@@ -1926,7 +2003,8 @@ body:not(.profile-gate) .continue-card {
   }
 
   body:not(.profile-gate) .hero-stage {
-    min-height: clamp(280px, 62vh, 420px);
+    min-height: 0;
+    max-height: none;
   }
 
   body:not(.profile-gate) .hero-actions {

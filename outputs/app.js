@@ -912,6 +912,8 @@ function renderProfileMosaic(profile, index) {
           class="profile-mosaic-img"
           src="${escapeHtml(item.logo)}"
           alt="${escapeHtml(item.title)}"
+          width="160"
+          height="96"
           loading="lazy"
           data-profile-mosaic-img
           data-fallback="${escapeHtml(fallbackPoster(profile.theme, itemIndex))}"
@@ -991,7 +993,7 @@ function renderHistory(profile) {
     .map(
       (entry) => `
       <article class="continue-card" data-progress-key="${escapeHtml(entry.key)}">
-        <img class="continue-poster" src="${entry.logo || defaultAvatar(entry.title)}" alt="${escapeHtml(entry.title)}" />
+        <img class="continue-poster" src="${entry.logo || defaultAvatar(entry.title)}" alt="${escapeHtml(entry.title)}" width="78" height="106" loading="lazy" />
         <div class="continue-body">
           <h4>${escapeHtml(entry.title)}</h4>
           <p>${escapeHtml(entry.subtitle || "Continua assistindo")}</p>
@@ -1014,7 +1016,7 @@ function renderCard(item, profile) {
   const primaryAction = item.type === "series" ? "Episodios" : "Assistir";
   return `
     <article class="media-card ${selected ? "selected" : ""}" data-item-id="${item.id}">
-      <img class="poster" src="${item.logo || defaultAvatar(item.title)}" alt="${escapeHtml(item.title)}" />
+      <img class="poster" src="${item.logo || defaultAvatar(item.title)}" alt="${escapeHtml(item.title)}" width="210" height="315" loading="lazy" />
       <div class="media-info">
         <span class="chip">${item.type === "series" ? "Series" : "Filme"}</span>
         <h4>${escapeHtml(item.title)}</h4>
@@ -1036,7 +1038,7 @@ function renderStreamingCard(item, profile) {
   return `
     <article class="media-card ${selected ? "selected" : ""}" data-item-id="${escapeHtml(item.id)}">
       <div class="poster-frame">
-        <img class="poster" src="${poster}" alt="${escapeHtml(item.title)}" loading="lazy" />
+        <img class="poster" src="${poster}" alt="${escapeHtml(item.title)}" width="210" height="315" loading="lazy" />
         ${renderCardProgress(profile, item)}
         <span class="card-type">${getStreamingItemTypeLabel(item)}</span>
       </div>
@@ -1346,7 +1348,7 @@ function renderEpisodeCard(episode, state) {
 
   return `
     <article class="episode-card ${state.selectedEpisodeId === episode.id ? "active" : ""}" data-episode-id="${escapeHtml(episode.id)}">
-      <img class="episode-poster" src="${poster}" alt="${escapeHtml(episode.fullTitle)}" />
+      <img class="episode-poster" src="${poster}" alt="${escapeHtml(episode.fullTitle)}" width="178" height="100" loading="lazy" />
       <div class="episode-copy">
         <div class="episode-topline">
           <span class="episode-index">EP ${episodeNumber}</span>
@@ -1395,7 +1397,7 @@ function renderInlineEpisodeCard(episode, profile) {
   const duration = episode.duration ? `<span>${escapeHtml(formatDurationText(episode.duration))}</span>` : "";
   return `
     <article class="inline-episode-card ${inlineSeriesState.selectedEpisodeId === episode.id ? "active" : ""}" data-episode-id="${escapeHtml(episode.id)}">
-      <img class="inline-episode-poster" src="${poster}" alt="${escapeHtml(episode.fullTitle || episode.title)}" />
+      <img class="inline-episode-poster" src="${poster}" alt="${escapeHtml(episode.fullTitle || episode.title)}" width="178" height="100" loading="lazy" />
       <div class="inline-episode-copy">
         <div class="episode-topline">
           <span class="episode-index">${episodeNumber}</span>
@@ -1532,7 +1534,7 @@ function renderSeriesDetailsLegacy() {
           .map(
             (episode) => `
               <article class="episode-card ${state.selectedEpisodeId === episode.id ? "active" : ""}" data-episode-id="${episode.id}">
-                <img class="episode-poster" src="${episode.logo || state.series.logo || defaultAvatar(episode.title)}" alt="${escapeHtml(episode.fullTitle)}" />
+                <img class="episode-poster" src="${episode.logo || state.series.logo || defaultAvatar(episode.title)}" alt="${escapeHtml(episode.fullTitle)}" width="178" height="100" loading="lazy" />
                 <div class="episode-copy">
                   <span class="chip">T${episode.seasonNumber || 1} · EP${episode.episodeNumber || ""}</span>
                   <h4>${escapeHtml(episode.title)}</h4>
@@ -2209,7 +2211,7 @@ function render() {
           >
             <span class="profile-card-glow"></span>
             <span class="profile-avatar-wrap">
-              <img class="profile-card-avatar" src="${renderAvatar(item)}" alt="${escapeHtml(item.name)}" loading="lazy" />
+              <img class="profile-card-avatar" src="${renderAvatar(item)}" alt="${escapeHtml(item.name)}" width="126" height="126" loading="lazy" />
               ${item.id === profile.id ? `<span class="profile-check" aria-hidden="true">&#10003;</span>` : ""}
             </span>
             <span class="profile-card-copy">
