@@ -56,6 +56,7 @@ const els = {
   importButton: document.querySelector("#import-form button[type='submit']"),
   tabs: document.getElementById("tabs"),
   exitBtn: document.getElementById("exit-btn"),
+  quickExitBtn: document.getElementById("quick-exit-btn"),
   searchInput: document.getElementById("search-input"),
   groupFilter: document.getElementById("group-filter"),
   libraryTitle: document.getElementById("library-title"),
@@ -1739,6 +1740,14 @@ function resetHomeView() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function exitToProfileGate() {
+  window.clearTimeout(searchRenderTimer);
+  activeTab = "all";
+  searchTerm = "";
+  if (els.searchInput) els.searchInput.value = "";
+  openProfileGate();
+}
+
 function getCarouselTrack(targetId) {
   return targetId ? document.getElementById(targetId) : null;
 }
@@ -2374,11 +2383,11 @@ els.editProfileBtn?.addEventListener("click", () => {
 });
 
 els.exitBtn?.addEventListener("click", () => {
-  window.clearTimeout(searchRenderTimer);
-  activeTab = "all";
-  searchTerm = "";
-  if (els.searchInput) els.searchInput.value = "";
-  openProfileGate();
+  exitToProfileGate();
+});
+
+els.quickExitBtn?.addEventListener("click", () => {
+  exitToProfileGate();
 });
 
 els.closeProfileModal?.addEventListener("click", () => {

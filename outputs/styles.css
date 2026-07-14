@@ -1513,6 +1513,196 @@ dialog::backdrop {
   display: none !important;
 }
 
+body:not(.profile-gate) {
+  background:
+    linear-gradient(180deg, #071222 0%, #050c18 42%, #020711 100%);
+}
+
+body:not(.profile-gate) .page-shell {
+  padding: 0 0 28px;
+}
+
+body:not(.profile-gate) .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  gap: 18px;
+  padding: 12px 20px;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  background: rgba(6, 12, 24, 0.96);
+  box-shadow: none;
+}
+
+body:not(.profile-gate) .brand {
+  font-size: clamp(1.7rem, 2.1vw, 2.2rem);
+}
+
+body:not(.profile-gate) .top-actions {
+  margin-left: auto;
+}
+
+body:not(.profile-gate) .profile-menu-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+}
+
+body:not(.profile-gate) .quick-exit-btn {
+  min-width: 96px;
+}
+
+body:not(.profile-gate) .content {
+  gap: 14px;
+  margin-top: 0;
+  padding-inline: clamp(10px, 1.4vw, 22px);
+}
+
+body:not(.profile-gate) .featured-banner,
+body:not(.profile-gate) .home-rail,
+body:not(.profile-gate) .similar-section {
+  display: none;
+}
+
+body:not(.profile-gate) .player-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid rgba(44, 115, 196, 0.38);
+  border-radius: 0 0 18px 18px;
+  background: #070d18;
+}
+
+body:not(.profile-gate) .hero-panel {
+  border-radius: 0;
+  background: #050a13;
+  box-shadow: none;
+}
+
+body:not(.profile-gate) .hero-stage {
+  min-height: clamp(360px, 52vh, 560px);
+  aspect-ratio: auto;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 18px),
+    #060b14;
+}
+
+body:not(.profile-gate) .video-player {
+  min-height: inherit;
+}
+
+body:not(.profile-gate) .player-empty {
+  background: transparent;
+}
+
+body:not(.profile-gate) .hero-footer {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 18px;
+  background: #071225;
+  border-top: 1px solid rgba(44, 115, 196, 0.28);
+}
+
+body:not(.profile-gate) .hero-copy h1 {
+  font-size: clamp(2rem, 3.4vw, 3.2rem);
+}
+
+body:not(.profile-gate) .hero-copy p,
+body:not(.profile-gate) #hero-episode-title {
+  max-width: 78ch;
+}
+
+.catalog-side-panel {
+  display: grid;
+  align-content: center;
+  gap: 14px;
+  min-width: 0;
+  padding: clamp(22px, 3vw, 36px);
+  border-left: 1px solid rgba(44, 115, 196, 0.42);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(83, 59, 156, 0.18), transparent 26rem),
+    linear-gradient(180deg, #151524, #0c0e19);
+}
+
+.catalog-side-panel .catalog-pill {
+  display: inline-flex;
+  width: fit-content;
+  min-width: 0;
+  border-color: rgba(255, 177, 73, 0.42);
+}
+
+.catalog-side-panel h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(1.55rem, 2.2vw, 2.1rem);
+}
+
+.catalog-side-panel p {
+  margin: 0;
+  color: #c6dcff;
+  line-height: 1.55;
+}
+
+.catalog-side-panel strong {
+  color: #84ff9f;
+}
+
+body:not(.profile-gate) .filter-strip {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) minmax(190px, 260px);
+  align-items: end;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(44, 115, 196, 0.38);
+  border-radius: 16px;
+  background: rgba(6, 13, 26, 0.92);
+}
+
+body:not(.profile-gate) .filter-strip .main-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+body:not(.profile-gate) .filter-strip .header-search {
+  max-width: none;
+}
+
+body:not(.profile-gate) .filter-strip .global-search input {
+  height: 48px;
+  border-radius: 10px;
+  background: #090a11;
+}
+
+body:not(.profile-gate) .filter-strip .select-box {
+  min-width: 0;
+}
+
+body:not(.profile-gate) .filter-strip select {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 10px;
+}
+
+body:not(.profile-gate) .rail-section,
+body:not(.profile-gate) .player-seasons-section {
+  border-color: rgba(44, 115, 196, 0.36);
+  border-radius: 16px;
+  background: rgba(6, 13, 26, 0.9);
+  box-shadow: none;
+}
+
+body:not(.profile-gate) .section-head h2 {
+  font-size: clamp(1.45rem, 2.2vw, 2rem);
+}
+
+body:not(.profile-gate) .media-card,
+body:not(.profile-gate) .continue-card {
+  background: #0b1830;
+  border-color: rgba(76, 150, 240, 0.24);
+  box-shadow: none;
+}
+
 @media (max-width: 1180px) {
   .topbar {
     flex-wrap: wrap;
@@ -1529,6 +1719,10 @@ dialog::backdrop {
 
   .catalog-pill {
     display: none;
+  }
+
+  body:not(.profile-gate) .catalog-side-panel .catalog-pill {
+    display: inline-flex;
   }
 }
 
@@ -1628,6 +1822,24 @@ dialog::backdrop {
   .series-modal-hero {
     grid-template-columns: 1fr;
   }
+
+  body:not(.profile-gate) .player-shell {
+    grid-template-columns: 1fr;
+  }
+
+  body:not(.profile-gate) .catalog-side-panel {
+    border-left: 0;
+    border-top: 1px solid rgba(44, 115, 196, 0.42);
+    align-content: start;
+  }
+
+  body:not(.profile-gate) .filter-strip {
+    grid-template-columns: 1fr;
+  }
+
+  body:not(.profile-gate) .hero-footer {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 560px) {
@@ -1698,6 +1910,27 @@ dialog::backdrop {
 
   .hero-actions .play-button {
     grid-column: 1 / -1;
+  }
+
+  body:not(.profile-gate) .topbar {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  body:not(.profile-gate) .brand span:last-child {
+    display: none;
+  }
+
+  body:not(.profile-gate) .quick-exit-btn {
+    min-width: 74px;
+  }
+
+  body:not(.profile-gate) .hero-stage {
+    min-height: clamp(280px, 62vh, 420px);
+  }
+
+  body:not(.profile-gate) .hero-actions {
+    grid-template-columns: 1fr 1fr auto;
   }
 
   .search-only-section .library-grid {

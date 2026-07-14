@@ -24,20 +24,8 @@
           </a>
         </div>
 
-        <label class="global-search header-search">
-          <span>Buscar</span>
-          <input id="search-input" type="search" placeholder="Buscar filmes, séries e animes..." />
-        </label>
-
         <div class="top-actions header-actions">
-          <nav class="main-nav" id="tabs" aria-label="Navegação principal">
-            <button class="tab active" data-tab="all" type="button">Início</button>
-          </nav>
           <button class="install-btn primary-btn" type="button">Instalar app</button>
-          <div class="catalog-pill">
-            <span id="catalog-status">Conectando catálogo</span>
-            <small id="catalog-source">Carregando...</small>
-          </div>
           <div class="profile-menu">
             <button id="profile-menu-btn" class="profile-menu-btn" type="button" aria-haspopup="true" aria-expanded="false">
               <img id="active-avatar" class="profile-avatar" alt="Foto de perfil ativa" />
@@ -58,6 +46,7 @@
               <button id="exit-btn" class="menu-item danger" type="button">Sair do perfil</button>
             </div>
           </div>
+          <button id="quick-exit-btn" class="ghost-btn quick-exit-btn" type="button">Sair</button>
         </div>
       </header>
 
@@ -119,6 +108,16 @@
               </div>
             </div>
           </article>
+
+          <aside class="catalog-side-panel">
+            <div class="catalog-pill">
+              <span id="catalog-status">Conectando catálogo</span>
+              <small id="catalog-source">Carregando...</small>
+            </div>
+            <h2>Catálogo automático</h2>
+            <p>A lista padrão carrega sozinha na sua conta.</p>
+            <strong>Lista carregada.</strong>
+          </aside>
         </section>
 
         <section id="player-seasons-section" class="player-seasons-section" hidden>
@@ -136,6 +135,15 @@
         </section>
 
         <section class="filter-strip search-results-controls">
+          <nav class="main-nav" id="tabs" aria-label="Navegação principal">
+            <button class="tab active" data-tab="all" type="button">Início</button>
+            <button class="tab" data-tab="movies" type="button">Filmes</button>
+            <button class="tab" data-tab="series" type="button">Séries</button>
+          </nav>
+          <label class="global-search header-search">
+            <span>Buscar</span>
+            <input id="search-input" type="search" placeholder="Pesquisar título, categoria ou episódio" />
+          </label>
           <label class="select-box">
             <span>Filtro de categoria</span>
             <select id="group-filter"></select>
