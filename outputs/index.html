@@ -64,15 +64,16 @@
       <main id="top" class="content">
         <section class="profile-hero" id="profiles">
           <div class="profile-hero-head">
-            <p class="eyebrow">Perfis</p>
-            <h2>Quem está assistindo?</h2>
-            <p>Escolha um perfil ou edite o nome e a foto do perfil ativo.</p>
+            <div class="profile-logo">M3UCINE</div>
+            <p class="eyebrow">Escolha seu universo</p>
+            <h2>ESCOLHA SEU UNIVERSO</h2>
+            <p>Cada perfil guarda suas próprias histórias e favoritos.</p>
           </div>
 
           <div id="profile-grid" class="profile-grid"></div>
 
           <div class="profile-hero-actions">
-            <button id="edit-profile-btn" class="primary-btn" type="button">Editar perfil</button>
+            <button id="edit-profile-btn" class="ghost-btn manage-profiles-btn" type="button">&#9881; Gerenciar perfis</button>
           </div>
         </section>
 
@@ -310,11 +311,22 @@
           <input id="edit-profile-avatar" type="file" accept="image/*" />
         </label>
 
+        <label class="field">
+          <span>Cor do perfil</span>
+          <select id="edit-profile-theme">
+            <option value="blue">Azul</option>
+            <option value="pink">Rosa</option>
+            <option value="violet">Violeta</option>
+            <option value="green">Verde</option>
+          </select>
+        </label>
+
         <div class="profile-modal-preview">
           <img id="edit-profile-avatar-preview" alt="Pré-visualização do perfil" />
         </div>
 
         <div class="profile-modal-actions">
+          <button id="delete-profile-btn" class="ghost-btn danger" type="button">Excluir perfil</button>
           <button class="primary-btn" type="submit">Salvar</button>
         </div>
       </form>

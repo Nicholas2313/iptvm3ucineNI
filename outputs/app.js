@@ -15,6 +15,8 @@ const PROFILE_SYNC_DEBOUNCE_MS = 700;
 const AVATAR_SIZE = 512;
 const SEARCH_RENDER_DELAY_MS = 120;
 const MAX_SEARCH_RESULTS = 96;
+const MAX_PROFILES = 4;
+const PROFILE_THEMES = ["blue", "pink", "violet", "green"];
 
 const els = {
   activeAvatar: document.getElementById("active-avatar"),
@@ -32,7 +34,9 @@ const els = {
   profileModalTitle: document.getElementById("profile-modal-title"),
   editProfileName: document.getElementById("edit-profile-name"),
   editProfileAvatar: document.getElementById("edit-profile-avatar"),
+  editProfileTheme: document.getElementById("edit-profile-theme"),
   editProfileAvatarPreview: document.getElementById("edit-profile-avatar-preview"),
+  deleteProfileBtn: document.getElementById("delete-profile-btn"),
   closeProfileModal: document.getElementById("close-profile-modal"),
   seriesModal: document.getElementById("series-modal"),
   closeSeriesModal: document.getElementById("close-series-modal"),
@@ -105,6 +109,8 @@ let profileSyncTimer = null;
 let profileSyncBusy = false;
 let profileSyncPending = false;
 let searchRenderTimer = null;
+let profileManageMode = false;
+let profileMosaicTimer = null;
 let activePlayback = null;
 let playbackRestoreTime = 0;
 let playbackSaveTimer = null;
@@ -181,6 +187,10 @@ function normalizeAvatarValue(avatar, name) {
   return avatar && !isLegacyGeneratedAvatar(avatar) ? avatar : defaultAvatar(name);
 }
 
+function normalizeProfileTheme(theme, index = 0) {
+  return PROFILE_THEMES.includes(theme) ? theme : PROFILE_THEMES[index % PROFILE_THEMES.length];
+}
+
 function profileCardLabel(index, profile, activeId) {
   return profile.id === activeId ? "Perfil ativo" : "Toque para selecionar";
 }
@@ -190,8 +200,12 @@ function openProfileEditor(profile) {
   els.profileModalTitle.textContent = profile.name;
   els.editProfileName.value = profile.name;
   els.editProfileAvatar.value = "";
+  if (els.editProfileTheme) els.editProfileTheme.value = normalizeProfileTheme(profile.theme);
   els.editProfileAvatarPreview.src = renderAvatar(profile);
   els.profileModal.dataset.profileId = profile.id;
+  if (els.deleteProfileBtn) {
+    els.deleteProfileBtn.hidden = state.profiles.length <= 1;
+  }
   if (typeof els.profileModal.showModal === "function") {
     els.profileModal.showModal();
   } else {
@@ -206,6 +220,43 @@ function closeProfileEditor() {
   } else {
     els.profileModal.removeAttribute("open");
   }
+}
+
+function getProfileById(profileId) {
+  return state.profiles.find((profile) => profile.id === profileId) || null;
+}
+
+function createManagedProfile() {
+  if (state.profiles.length >= MAX_PROFILES) return;
+  const profile = createProfile(`Perfil ${state.profiles.length + 1}`, state.profiles.length);
+  state.profiles.push(profile);
+  state.activeProfileId = profile.id;
+  profileManageMode = true;
+  saveState();
+  render();
+  queueProfileSync();
+  openProfileEditor(profile);
+}
+
+function deleteProfile(profileId) {
+  if (state.profiles.length <= 1) {
+    window.alert("Você precisa manter pelo menos um perfil.");
+    return;
+  }
+  const profile = getProfileById(profileId);
+  if (!profile) return;
+  const confirmed = window.confirm(`Excluir o perfil "${profile.name}"? Favoritos e progresso deste perfil também deixarão de aparecer.`);
+  if (!confirmed) return;
+  state.profiles = state.profiles.filter((item) => item.id !== profileId);
+  delete progressState[profileId];
+  saveProgressState();
+  if (state.activeProfileId === profileId) {
+    state.activeProfileId = state.profiles[0]?.id || null;
+  }
+  closeProfileEditor();
+  saveState();
+  render();
+  queueProfileSync();
 }
 
 function readFileAsDataUrl(file, fallbackName) {
@@ -251,17 +302,19 @@ async function fileToAvatarDataUrl(file, fallbackName) {
 
 function openProfileGate() {
   profileGateOpen = false;
+  profileManageMode = false;
   document.body.classList.add("profile-gate");
   closeProfileEditor();
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function createProfile(name) {
+function createProfile(name, index = 0) {
   return {
     id: uid(),
     name,
     avatar: defaultAvatar(name),
+    theme: normalizeProfileTheme(null, index),
     library: [],
     favorites: [],
   };
@@ -277,23 +330,25 @@ function loadState() {
   return normalizeState({
     activeProfileId: null,
     profiles: [
-      createProfile("Perfil 1"),
-      createProfile("Perfil 2"),
-      createProfile("Perfil 3"),
-      createProfile("Perfil 4"),
+      createProfile("Perfil 1", 0),
+      createProfile("Perfil 2", 1),
+      createProfile("Perfil 3", 2),
+      createProfile("Perfil 4", 3),
     ],
   });
 }
 
 function normalizeState(input) {
   const sourceProfiles = Array.isArray(input.profiles) ? input.profiles : [];
-  const profiles = Array.from({ length: 4 }, (_, index) => {
-    const profile = sourceProfiles[index];
+  const source = sourceProfiles.length ? sourceProfiles.slice(0, MAX_PROFILES) : Array.from({ length: MAX_PROFILES });
+  const profiles = source.map((sourceProfile, index) => {
+    const profile = sourceProfile || sourceProfiles[index];
     const fallbackName = `Perfil ${index + 1}`;
     return {
       id: profile?.id || uid(),
       name: profile?.name || fallbackName,
       avatar: normalizeAvatarValue(profile?.avatar, profile?.name || fallbackName),
+      theme: normalizeProfileTheme(profile?.theme, index),
       library: [],
       favorites: Array.isArray(profile?.favorites) ? profile.favorites : [],
     };
@@ -311,10 +366,11 @@ function normalizeState(input) {
 function saveState() {
   const storedState = {
     activeProfileId: state.activeProfileId,
-    profiles: state.profiles.map((profile) => ({
+    profiles: state.profiles.map((profile, index) => ({
       id: profile.id,
       name: profile.name,
       avatar: profile.avatar,
+      theme: normalizeProfileTheme(profile.theme, index),
       favorites: profile.favorites,
       library: [],
     })),
@@ -325,9 +381,11 @@ function saveState() {
 
 function buildProfileSyncPayload() {
   return {
-    profiles: state.profiles.slice(0, 4).map((profile, index) => ({
+    profiles: state.profiles.slice(0, MAX_PROFILES).map((profile, index) => ({
+      id: profile.id,
       name: toText(profile.name) || `Perfil ${index + 1}`,
       avatar: normalizeAvatarValue(profile.avatar, profile.name),
+      theme: normalizeProfileTheme(profile.theme, index),
       favorites: Array.isArray(profile.favorites) ? Array.from(new Set(profile.favorites)).slice(0, 1000) : [],
     })),
   };
@@ -338,40 +396,77 @@ function sameList(left, right) {
   return left.every((item, index) => item === right[index]);
 }
 
+function applyRemoteProfile(profile, remote, index) {
+  let changed = false;
+  const remoteId = toText(remote.id);
+  if (remoteId && profile.id !== remoteId) {
+    profile.id = remoteId;
+    changed = true;
+  }
+
+  const remoteName = toText(remote.name);
+  if (remoteName && remoteName !== profile.name) {
+    profile.name = remoteName;
+    changed = true;
+  }
+
+  if (typeof remote.avatar === "string" && remote.avatar) {
+    const remoteAvatar = normalizeAvatarValue(remote.avatar, profile.name);
+    if (remoteAvatar !== profile.avatar) {
+      profile.avatar = remoteAvatar;
+      changed = true;
+    }
+  } else if (isLegacyGeneratedAvatar(profile.avatar)) {
+    profile.avatar = defaultAvatar(profile.name);
+    changed = true;
+  }
+
+  const remoteTheme = normalizeProfileTheme(remote.theme, index);
+  if (remoteTheme !== profile.theme) {
+    profile.theme = remoteTheme;
+    changed = true;
+  }
+
+  if (Array.isArray(remote.favorites)) {
+    const remoteFavorites = Array.from(new Set(remote.favorites.map((item) => String(item || "")).filter(Boolean)));
+    if (!sameList(remoteFavorites, profile.favorites)) {
+      profile.favorites = remoteFavorites;
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
 function applyProfileSyncPayload(payload) {
-  const remoteProfiles = Array.isArray(payload?.profiles) ? payload.profiles : [];
+  const remoteProfiles = Array.isArray(payload?.profiles) ? payload.profiles.slice(0, MAX_PROFILES) : [];
   if (!remoteProfiles.length) return false;
 
   let changed = false;
-  state.profiles.forEach((profile, index) => {
-    const remote = remoteProfiles[index];
-    if (!remote) return;
-
-    const remoteName = toText(remote.name);
-    if (remoteName && remoteName !== profile.name) {
-      profile.name = remoteName;
-      changed = true;
-    }
-
-    if (typeof remote.avatar === "string" && remote.avatar) {
-      const remoteAvatar = normalizeAvatarValue(remote.avatar, profile.name);
-      if (remoteAvatar !== profile.avatar) {
-        profile.avatar = remoteAvatar;
-        changed = true;
-      }
-    } else if (isLegacyGeneratedAvatar(profile.avatar)) {
-      profile.avatar = defaultAvatar(profile.name);
-      changed = true;
-    }
-
-    if (Array.isArray(remote.favorites)) {
-      const remoteFavorites = Array.from(new Set(remote.favorites.map((item) => String(item || "")).filter(Boolean)));
-      if (!sameList(remoteFavorites, profile.favorites)) {
-        profile.favorites = remoteFavorites;
-        changed = true;
-      }
-    }
+  const nextProfiles = remoteProfiles.map((remote, index) => {
+    const remoteId = toText(remote.id);
+    return (
+      (remoteId && state.profiles.find((profile) => profile.id === remoteId)) ||
+      state.profiles[index] ||
+      createProfile(toText(remote.name) || `Perfil ${index + 1}`, index)
+    );
   });
+  if (
+    nextProfiles.length !== state.profiles.length ||
+    nextProfiles.some((profile, index) => profile !== state.profiles[index])
+  ) {
+    state.profiles = nextProfiles;
+    changed = true;
+  }
+
+  state.profiles.forEach((profile, index) => {
+    if (applyRemoteProfile(profile, remoteProfiles[index], index)) changed = true;
+  });
+
+  if (!state.profiles.some((profile) => profile.id === state.activeProfileId)) {
+    state.activeProfileId = state.profiles[0]?.id || null;
+    changed = true;
+  }
 
   return changed;
 }
@@ -729,6 +824,100 @@ function setStatus(message, tone = "info") {
 
 function renderAvatar(profile) {
   return normalizeAvatarValue(profile.avatar, profile.name);
+}
+
+function fallbackPoster(theme = "blue", index = 0) {
+  const colors = {
+    blue: ["#42d7ff", "#075dff"],
+    pink: ["#ff7ac8", "#8d3dff"],
+    violet: ["#b56cff", "#4b6dff"],
+    green: ["#31f0a2", "#0b7fce"],
+  };
+  const [start, end] = colors[normalizeProfileTheme(theme)] || colors.blue;
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="360" height="540" viewBox="0 0 360 540">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+          <stop stop-color="${start}"/>
+          <stop offset="1" stop-color="${end}"/>
+        </linearGradient>
+        <radialGradient id="r" cx="50%" cy="18%" r="70%">
+          <stop stop-color="rgba(255,255,255,.34)"/>
+          <stop offset="1" stop-color="rgba(255,255,255,0)"/>
+        </radialGradient>
+      </defs>
+      <rect width="360" height="540" rx="34" fill="#061329"/>
+      <rect width="360" height="540" rx="34" fill="url(#g)" opacity=".72"/>
+      <rect width="360" height="540" rx="34" fill="url(#r)"/>
+      <circle cx="${110 + index * 26}" cy="${140 + index * 18}" r="88" fill="rgba(255,255,255,.14)"/>
+      <path d="M64 394c56-84 126-126 210-126 28 0 54 5 78 16v256H0v-58c14-31 35-60 64-88z" fill="rgba(2,8,18,.42)"/>
+      <text x="34" y="80" fill="white" font-family="Arial, sans-serif" font-size="32" font-weight="800">M3UCINE</text>
+    </svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function findKnownLibraryItem(itemId, preferredProfile) {
+  if (!itemId) return null;
+  const preferred = preferredProfile?.library?.find((item) => item.id === itemId);
+  if (preferred) return preferred;
+  for (const profile of state.profiles) {
+    const found = profile.library?.find((item) => item.id === itemId);
+    if (found) return found;
+  }
+  return null;
+}
+
+function addMosaicItem(list, seen, item, label) {
+  const logo = item?.logo || item?.poster || "";
+  const title = item?.title || item?.fullTitle || label || "M3UCINE";
+  const key = logo || item?.id || item?.key || item?.url || title;
+  if (!logo || seen.has(key)) return;
+  seen.add(key);
+  list.push({ logo, title, label });
+}
+
+function getProfileMosaicItems(profile, index = 0) {
+  const items = [];
+  const seen = new Set();
+
+  profile.favorites.forEach((favoriteId) => {
+    addMosaicItem(items, seen, findKnownLibraryItem(favoriteId, profile), "Favorito");
+  });
+
+  Object.values(getProfileProgress(profile.id))
+    .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))
+    .forEach((entry) => addMosaicItem(items, seen, entry, "Continuar"));
+
+  profile.library
+    .filter((item) => item.logo)
+    .slice(0, 24)
+    .forEach((item) => addMosaicItem(items, seen, item, "Recomendado"));
+
+  if (items.length) return items.slice(0, 6);
+
+  return Array.from({ length: 4 }, (_, fallbackIndex) => ({
+    logo: fallbackPoster(profile.theme, fallbackIndex + index),
+    title: "Arte M3UCINE",
+    label: "Sem conteúdo salvo",
+  }));
+}
+
+function renderProfileMosaic(profile, index) {
+  const mosaic = getProfileMosaicItems(profile, index);
+  return mosaic
+    .map(
+      (item, itemIndex) => `
+        <img
+          class="profile-mosaic-img"
+          src="${escapeHtml(item.logo)}"
+          alt="${escapeHtml(item.title)}"
+          loading="lazy"
+          data-profile-mosaic-img
+          data-fallback="${escapeHtml(fallbackPoster(profile.theme, itemIndex))}"
+        />
+      `
+    )
+    .join("");
 }
 
 function getProfileMeta(profile) {
@@ -1589,6 +1778,37 @@ function scheduleSearchRender() {
   }, SEARCH_RENDER_DELAY_MS);
 }
 
+function shouldPauseProfileMosaic() {
+  return (
+    document.hidden ||
+    !document.body.classList.contains("profile-gate") ||
+    document.body.classList.contains("light-mode") ||
+    Boolean(document.querySelector(".profile-card:hover, .profile-card:focus-within"))
+  );
+}
+
+function rotateProfileMosaics() {
+  if (shouldPauseProfileMosaic()) return;
+  document.querySelectorAll(".profile-card:not(.profile-create-card) .profile-mosaic").forEach((mosaic) => {
+    const images = Array.from(mosaic.querySelectorAll(".profile-mosaic-img"));
+    if (images.length < 3) return;
+    mosaic.classList.add("is-swapping");
+    window.setTimeout(() => {
+      const first = images[0];
+      const second = images[1];
+      if (first) mosaic.append(first);
+      if (second && images.length > 4) mosaic.append(second);
+      mosaic.classList.remove("is-swapping");
+    }, 260);
+  });
+}
+
+function restartProfileMosaicRotation() {
+  window.clearInterval(profileMosaicTimer);
+  if (!document.body.classList.contains("profile-gate")) return;
+  profileMosaicTimer = window.setInterval(rotateProfileMosaics, 8000);
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -1969,18 +2189,49 @@ function render() {
   }
 
   if (els.profileGrid) {
-    els.profileGrid.innerHTML = state.profiles
+    const profileCards = state.profiles
       .map(
         (item, index) => `
-          <button class="profile-card ${item.id === profile.id ? "active" : ""}" data-profile-id="${item.id}" type="button">
-            <span class="profile-card-ring"></span>
-            <img class="profile-card-avatar" src="${renderAvatar(item)}" alt="${escapeHtml(item.name)}" />
-            <strong>${escapeHtml(item.name)}</strong>
-            <small>${profileCardLabel(index, item, profile.id)}</small>
+          <button
+            class="profile-card theme-${normalizeProfileTheme(item.theme, index)} ${item.id === profile.id ? "active" : ""}"
+            data-profile-id="${item.id}"
+            type="button"
+            aria-label="${profileManageMode ? `Editar ${item.name}` : `Entrar no perfil ${item.name}`}"
+          >
+            <span class="profile-card-glow"></span>
+            <span class="profile-avatar-wrap">
+              <img class="profile-card-avatar" src="${renderAvatar(item)}" alt="${escapeHtml(item.name)}" loading="lazy" />
+              ${item.id === profile.id ? `<span class="profile-check" aria-hidden="true">&#10003;</span>` : ""}
+            </span>
+            <span class="profile-card-copy">
+              <strong>${escapeHtml(item.name)}</strong>
+              <small>Seus favoritos</small>
+            </span>
+            <span class="profile-mosaic" aria-hidden="true">
+              ${renderProfileMosaic(item, index)}
+            </span>
+            <span class="profile-card-footer">${profileManageMode ? "Editar perfil" : profileCardLabel(index, item, profile.id)}</span>
           </button>
         `
       )
       .join("");
+    const createCard =
+      profileManageMode && state.profiles.length < MAX_PROFILES
+        ? `
+          <button class="profile-card profile-create-card" data-create-profile type="button" aria-label="Criar novo perfil">
+            <span class="profile-create-icon">+</span>
+            <span class="profile-card-copy">
+              <strong>Novo perfil</strong>
+              <small>Criar universo</small>
+            </span>
+          </button>
+        `
+        : "";
+    els.profileGrid.innerHTML = `${profileCards}${createCard}`;
+  }
+  document.body.classList.toggle("profile-manage-mode", profileManageMode);
+  if (els.editProfileBtn) {
+    els.editProfileBtn.innerHTML = profileManageMode ? "Concluir" : "&#9881; Gerenciar perfis";
   }
 
   if (els.statItems) els.statItems.textContent = String(library.length);
@@ -2061,6 +2312,7 @@ function render() {
 
   syncTabs();
   requestAnimationFrame(updateCarouselControls);
+  restartProfileMosaicRotation();
 }
 
 function rerender() {
@@ -2100,12 +2352,25 @@ els.avatarInput?.addEventListener("change", async () => {
 });
 
 els.profileGrid?.addEventListener("click", (event) => {
+  const createButton = event.target.closest("[data-create-profile]");
+  if (createButton) {
+    createManagedProfile();
+    return;
+  }
   const button = event.target.closest("[data-profile-id]");
-  if (button) setActiveProfile(button.dataset.profileId);
+  if (!button) return;
+  const profile = getProfileById(button.dataset.profileId);
+  if (!profile) return;
+  if (profileManageMode) {
+    openProfileEditor(profile);
+    return;
+  }
+  setActiveProfile(button.dataset.profileId);
 });
 
 els.editProfileBtn?.addEventListener("click", () => {
-  openProfileEditor(getActiveProfile());
+  profileManageMode = !profileManageMode;
+  render();
 });
 
 els.exitBtn?.addEventListener("click", () => {
@@ -2122,9 +2387,10 @@ els.closeProfileModal?.addEventListener("click", () => {
 
 els.profileEditForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const profile = getActiveProfile();
+  const profile = getProfileById(els.profileModal?.dataset.profileId) || getActiveProfile();
   const name = toText(els.editProfileName?.value);
   if (name) profile.name = name;
+  profile.theme = normalizeProfileTheme(els.editProfileTheme?.value, state.profiles.indexOf(profile));
 
   const file = els.editProfileAvatar?.files?.[0];
   if (file) {
@@ -2137,7 +2403,7 @@ els.profileEditForm?.addEventListener("submit", async (event) => {
 });
 
 els.editProfileAvatar?.addEventListener("change", async () => {
-  const profile = getActiveProfile();
+  const profile = getProfileById(els.profileModal?.dataset.profileId) || getActiveProfile();
   const file = els.editProfileAvatar.files?.[0];
   if (!els.editProfileAvatarPreview) return;
   if (!file) {
@@ -2145,6 +2411,10 @@ els.editProfileAvatar?.addEventListener("change", async () => {
     return;
   }
   els.editProfileAvatarPreview.src = await fileToAvatarDataUrl(file, profile.name);
+});
+
+els.deleteProfileBtn?.addEventListener("click", () => {
+  deleteProfile(els.profileModal?.dataset.profileId);
 });
 
 els.tabs?.addEventListener("click", (event) => {
@@ -2164,6 +2434,17 @@ document.addEventListener("click", (event) => {
   scrollCarousel(button.dataset.carouselTarget, Number(button.dataset.carouselDir || 1));
 });
 
+document.addEventListener(
+  "error",
+  (event) => {
+    const image = event.target?.closest?.("[data-profile-mosaic-img]");
+    if (!image || image.dataset.fallbackApplied === "true") return;
+    image.dataset.fallbackApplied = "true";
+    image.src = image.dataset.fallback || fallbackPoster();
+  },
+  true
+);
+
 document.addEventListener("keydown", (event) => {
   if (!["ArrowLeft", "ArrowRight", "Enter", " "].includes(event.key)) return;
   const button = event.target.closest?.("[data-carousel-target]");
@@ -2171,6 +2452,20 @@ document.addEventListener("keydown", (event) => {
   event.preventDefault();
   const direction = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : Number(button.dataset.carouselDir || 1);
   scrollCarousel(button.dataset.carouselTarget, direction);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (!document.body.classList.contains("profile-gate")) return;
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+  const focusables = [...document.querySelectorAll(".profile-card, .manage-profiles-btn")].filter(
+    (element) => !element.disabled
+  );
+  if (!focusables.length) return;
+  const currentIndex = Math.max(0, focusables.indexOf(document.activeElement));
+  const direction = event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1;
+  const nextIndex = (currentIndex + direction + focusables.length) % focusables.length;
+  event.preventDefault();
+  focusables[nextIndex]?.focus();
 });
 
 document.querySelectorAll(".carousel-track").forEach((track) => {

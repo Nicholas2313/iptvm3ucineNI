@@ -15,6 +15,7 @@ const maxTotalLibraryItems = Number(process.env.MAX_TOTAL_LIBRARY_ITEMS || 20000
 const maxMovieItems = Number(process.env.MAX_MOVIE_ITEMS || 20000);
 const maxSeriesItems = Number(process.env.MAX_SERIES_ITEMS || 10000);
 const profileStateFile = process.env.PROFILE_STATE_FILE || path.join(root, "..", ".m3ucine-profile-state.json");
+const profileThemes = new Set(["blue", "pink", "violet", "green"]);
 const xtreamBases = (
   process.env.XTREAM_BASE_URLS ||
   ["http://ph1.fun", "http://topcar123.com.br", "http://phspr.pro"].join("|")
@@ -66,17 +67,19 @@ function emptyProfileState() {
 
 function sanitizeProfileState(input) {
   const sourceProfiles = Array.isArray(input?.profiles) ? input.profiles : [];
-  const profiles = Array.from({ length: 4 }, (_, index) => {
-    const profile = sourceProfiles[index] || {};
+  const safeProfiles = sourceProfiles.length ? sourceProfiles.slice(0, 4) : [];
+  const profiles = safeProfiles.map((profile, index) => {
+    const id = String(profile.id || "").trim().slice(0, 80);
     const name = String(profile.name || `Perfil ${index + 1}`).trim().slice(0, 24);
     const avatar = typeof profile.avatar === "string" && profile.avatar.startsWith("data:image/")
       ? profile.avatar.slice(0, 1800000)
       : "";
+    const theme = profileThemes.has(profile.theme) ? profile.theme : ["blue", "pink", "violet", "green"][index % 4];
     const favorites = Array.isArray(profile.favorites)
       ? Array.from(new Set(profile.favorites.map((item) => String(item || "").trim()).filter(Boolean))).slice(0, 1000)
       : [];
 
-    return { name, avatar, favorites };
+    return { id, name, avatar, theme, favorites };
   });
 
   return { profiles, updatedAt: Date.now() };
