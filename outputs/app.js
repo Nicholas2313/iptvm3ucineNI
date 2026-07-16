@@ -1018,7 +1018,9 @@ function parseAttributes(text) {
 
 function detectType(title, group) {
   const haystack = normalizeText(`${title} ${group}`);
-  if (/(canal|canais|live|ao vivo|channel|iptv|tv ao vivo|broadcast)/i.test(haystack)) return null;
+  const hasMediaHint = /(^|\b)(filme|filmes|movie|movies|vod|cinema|serie|series|seriado|temporada|season|episode|episodio|episodios|show|capitulo|anime|animes|desenho|desenhos|dorama|novela)(\b|$)/i.test(haystack);
+  const hasChannelHint = /(^|\b)(canal|canais|live|ao vivo|channel|iptv|tv ao vivo|broadcast|24h|24 horas|noticias|jornal|esporte ao vivo|futebol ao vivo|ppv|premiere|globo|record|sbt|band|rede tv|cnn|fox sports|espn|sportv)(\b|$)/i.test(haystack);
+  if (hasChannelHint && !hasMediaHint) return null;
   if (/(serie|series|season|episode|episodio|episodios|show|capitulo)/i.test(haystack)) return "series";
   if (/(filme|filmes|movie|movies|vod|cinema)/i.test(haystack)) return "movie";
   return "movie";
@@ -1100,8 +1102,68 @@ async function fetchDefaultM3uText() {
   return await response.text();
 }
 
-function importItemsIntoProfile(profile, items) {
-  const organized = auditAndOrganizeCatalog(items.slice(0, MAX_LIBRARY_ITEMS));
+function loadM3uCatalogInWorker({ url = "", defaultM3u = false } = {}) {
+  if (!window.Worker) {
+    return null;
+  }
+
+  return new Promise((resolve, reject) => {
+    let worker;
+    try {
+      worker = new Worker("./catalog-worker.js");
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    const cleanup = () => worker.terminate();
+    worker.onmessage = (event) => {
+      const data = event.data || {};
+      if (data.type === "progress" && data.message) {
+        setStatus(data.message);
+        return;
+      }
+      cleanup();
+      if (data.type === "done") {
+        resolve({ items: Array.isArray(data.items) ? data.items : [], audit: data.audit || null });
+        return;
+      }
+      reject(new Error(data.message || "Falha ao processar catalogo."));
+    };
+    worker.onerror = (event) => {
+      cleanup();
+      reject(new Error(event.message || "Falha no processamento em segundo plano."));
+    };
+    worker.postMessage({ url, defaultM3u });
+  });
+}
+
+async function fetchM3uCatalog({ url = "", defaultM3u = false } = {}) {
+  const workerLoad = loadM3uCatalogInWorker({ url, defaultM3u });
+  if (workerLoad) {
+    try {
+      const result = await workerLoad;
+      return {
+        items: result.items,
+        audit: result.audit,
+        preorganized: true,
+      };
+    } catch (error) {
+      console.warn("[M3UCINE] Worker do catalogo indisponivel, usando fallback.", error);
+    }
+  }
+
+  const text = defaultM3u ? await fetchDefaultM3uText() : await fetchTextWithFallback(url);
+  return {
+    items: parseM3U(text),
+    audit: null,
+    preorganized: false,
+  };
+}
+
+function importItemsIntoProfile(profile, items, options = {}) {
+  const organized = options.preorganized
+    ? { items: items.slice(0, MAX_LIBRARY_ITEMS), audit: options.audit || null }
+    : auditAndOrganizeCatalog(items.slice(0, MAX_LIBRARY_ITEMS));
   profile.library = organized.items.slice(0, MAX_LIBRARY_ITEMS);
   profile.catalogAudit = organized.audit;
   profile.favorites = profile.favorites.filter((favoriteId) =>
@@ -2941,14 +3003,13 @@ els.importForm?.addEventListener("submit", async (event) => {
       return;
     }
 
-    const text = await fetchTextWithFallback(url);
-    const items = parseM3U(text);
+    const { items, audit, preorganized } = await fetchM3uCatalog({ url });
     if (!items.length) {
       setStatus("Nao encontrei filmes ou series validos nessa lista.", "error");
       return;
     }
 
-    importItemsIntoProfile(profile, items);
+    importItemsIntoProfile(profile, items, { preorganized, audit });
     localStorage.setItem(LAST_M3U_URL_KEY, url);
     setStatus(`${profile.library.length} itens carregados com sucesso.`);
     rerender();
@@ -3182,21 +3243,14 @@ async function bootstrapLibrary() {
   try {
     for (const source of sources) {
       try {
-        if (source.kind === "m3u") {
-          const text = await fetchTextWithFallback(source.url);
-          const items = parseM3U(text);
+        if (source.kind === "m3u" || source.kind === "default-m3u") {
+          const { items, audit, preorganized } = await fetchM3uCatalog({
+            url: source.url || "",
+            defaultM3u: source.kind === "default-m3u",
+          });
           if (items.length) {
-            importItemsIntoProfile(profile, items);
-            setStatus(`${profile.library.length} itens restaurados automaticamente.`);
-            rerender();
-            return;
-          }
-        } else if (source.kind === "default-m3u") {
-          const text = await fetchDefaultM3uText();
-          const items = parseM3U(text);
-          if (items.length) {
-            importItemsIntoProfile(profile, items);
-            setStatus(`${profile.library.length} itens carregados automaticamente.`);
+            importItemsIntoProfile(profile, items, { preorganized, audit });
+            setStatus(`${profile.library.length} itens ${source.kind === "m3u" ? "restaurados" : "carregados"} automaticamente.`);
             rerender();
             return;
           }
