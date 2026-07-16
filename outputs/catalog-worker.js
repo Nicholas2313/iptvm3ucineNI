@@ -226,7 +226,10 @@ self.onmessage = async (event) => {
     const { url, defaultM3u } = event.data || {};
     const endpoint = defaultM3u ? "/api/default-m3u" : `/api/fetch-m3u?url=${encodeURIComponent(url || "")}`;
     const response = await fetch(endpoint, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Falha ao carregar M3U (${response.status})`);
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(detail || `Falha ao carregar M3U (${response.status})`);
+    }
     self.postMessage({ type: "progress", message: "Organizando catálogo..." });
     const text = await response.text();
     const parsed = parseM3U(text);

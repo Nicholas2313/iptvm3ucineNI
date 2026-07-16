@@ -1203,7 +1203,8 @@ async function fetchTextWithFallback(url) {
   const proxyUrl = `/api/fetch-m3u?url=${encodeURIComponent(url)}`;
   const proxied = await withTimeout(fetch(proxyUrl, { cache: "no-store" }), LIBRARY_FETCH_TIMEOUT_MS, "Tempo esgotado");
   if (!proxied.ok) {
-    throw new Error(`Falha ao carregar a lista (${proxied.status})`);
+    const detail = await proxied.text().catch(() => "");
+    throw new Error(detail || `Falha ao carregar a lista (${proxied.status})`);
   }
   return await proxied.text();
 }
@@ -1211,9 +1212,21 @@ async function fetchTextWithFallback(url) {
 async function fetchDefaultM3uText() {
   const response = await withTimeout(fetch("/api/default-m3u", { cache: "no-store" }), LIBRARY_FETCH_TIMEOUT_MS, "Tempo esgotado");
   if (!response.ok) {
-    throw new Error(`Falha ao carregar a lista automatica (${response.status})`);
+    const detail = await response.text().catch(() => "");
+    throw new Error(detail || `Falha ao carregar a lista automatica (${response.status})`);
   }
   return await response.text();
+}
+
+function getPlaylistErrorMessage(error) {
+  const message = String(error?.message || error || "");
+  if (/credenciais|invalid_credentials|username or password/i.test(message)) {
+    return "Credenciais da playlist inválidas";
+  }
+  if (/tempo esgotado|timeout/i.test(message)) {
+    return "Tempo esgotado ao carregar a playlist";
+  }
+  return "Erro ao carregar a playlist";
 }
 
 function loadM3uCatalogInWorker({ url = "", defaultM3u = false } = {}) {
@@ -3252,7 +3265,7 @@ els.importForm?.addEventListener("submit", async (event) => {
     setPlaylistStatus("loaded", "Playlist carregada");
     rerender();
   } catch (error) {
-    setPlaylistStatus("error", "Erro ao carregar a playlist");
+    setPlaylistStatus("error", getPlaylistErrorMessage(error));
     setStatus(
       `Nao foi possivel carregar esse link. ${error instanceof Error ? error.message : "Tente novamente."}`,
       "error"
@@ -3489,6 +3502,7 @@ async function bootstrapLibrary({ force = false } = {}) {
   if (savedUrl) sources.push({ kind: "m3u", url: savedUrl });
   sources.push({ kind: "default-m3u" });
   sources.push({ kind: "default" });
+  let lastPlaylistError = null;
 
   try {
     for (const source of sources) {
@@ -3516,12 +3530,17 @@ async function bootstrapLibrary({ force = false } = {}) {
               rerender();
               return;
             }
+          } else {
+            const detail = await response.text().catch(() => "");
+            throw new Error(detail || `Falha ao carregar biblioteca (${response.status})`);
           }
         }
-      } catch {}
+      } catch (error) {
+        lastPlaylistError = error;
+      }
     }
     setStatus("Nenhum catalogo automatico foi carregado.");
-    setPlaylistStatus("error", "Erro ao carregar a playlist");
+    setPlaylistStatus("error", getPlaylistErrorMessage(lastPlaylistError));
   } finally {
     profileCatalogLoading = false;
     const activeProfile = getActiveProfile();

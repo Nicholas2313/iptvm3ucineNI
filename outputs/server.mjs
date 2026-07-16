@@ -230,12 +230,20 @@ function looksLikeM3u(text) {
   return /^#EXTM3U/im.test(source) && /#EXTINF:/i.test(source) && /^https?:\/\//im.test(source);
 }
 
+function hasInvalidCredentials(text) {
+  return /INVALID_CREDENTIALS|Username or password is invalid|user.*password.*invalid/i.test(String(text || ""));
+}
+
 async function fetchText(target) {
   const response = await fetchM3u(target);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
   }
-  return response.text();
+  const text = await response.text();
+  if (hasInvalidCredentials(text)) {
+    throw new Error("credenciais invalidas");
+  }
+  return text;
 }
 
 async function fetchJson(target) {
@@ -253,6 +261,10 @@ async function fetchFirstWorkingM3u(targets) {
         const text = await response.text();
         if (looksLikeM3u(text)) {
           return { text, target };
+        }
+        if (hasInvalidCredentials(text)) {
+          errors.push(`${target} -> credenciais invalidas`);
+          continue;
         }
         errors.push(`${target} -> resposta sem M3U`);
         continue;
@@ -711,7 +723,12 @@ const server = http.createServer(async (req, res) => {
 
       const result = await fetchFirstWorkingM3u(targets);
       if (!result.text) {
-        return send(res, 502, `No M3U source worked: ${result.errors.join("; ")}`);
+        const authError = result.errors.some((error) => /credenciais invalidas/i.test(error));
+        return send(
+          res,
+          authError ? 401 : 502,
+          authError ? "Credenciais da playlist invalidas" : `No M3U source worked: ${result.errors.join("; ")}`
+        );
       }
 
       return send(res, 200, result.text, {
@@ -731,7 +748,12 @@ const server = http.createServer(async (req, res) => {
     if (requestUrl.pathname === "/api/default-library") {
       const result = await fetchFirstWorkingXtreamLibrary();
       if (!result.items.length) {
-        return send(res, 502, `No Xtream source worked: ${result.errors.join("; ")}`);
+        const authError = result.errors.some((error) => /credenciais invalidas/i.test(error));
+        return send(
+          res,
+          authError ? 401 : 502,
+          authError ? "Credenciais da playlist invalidas" : `No Xtream source worked: ${result.errors.join("; ")}`
+        );
       }
 
       return send(res, 200, JSON.stringify(result.items), {
