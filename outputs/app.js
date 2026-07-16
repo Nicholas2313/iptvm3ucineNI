@@ -110,6 +110,7 @@ const recentHistory = loadHistory();
 let isImporting = false;
 let profileGateOpen = false;
 let profileCatalogLoading = false;
+let pendingCatalogBootstrap = false;
 let profileSyncTimer = null;
 let profileSyncBusy = false;
 let profileSyncPending = false;
@@ -535,6 +536,12 @@ function setActiveProfile(id) {
   document.body.classList.remove("profile-gate");
   saveState();
   render();
+  if (getActiveProfile().library.length > 0) {
+    setPlaylistStatus("loaded", "Playlist carregada");
+  } else {
+    setPlaylistStatus("loading", "Carregando playlist...");
+    bootstrapLibrary();
+  }
 }
 
 function loadHistory() {
@@ -3358,7 +3365,10 @@ if (savedUrl && els.m3uUrl) {
 
 async function bootstrapLibrary({ force = false } = {}) {
   const profile = getActiveProfile();
-  if (profileCatalogLoading) return;
+  if (profileCatalogLoading) {
+    pendingCatalogBootstrap = pendingCatalogBootstrap || force || profile.library.length === 0;
+    return;
+  }
   if (!force && profile.library.length > 0) {
     setPlaylistStatus("loaded", "Playlist carregada");
     return;
@@ -3410,6 +3420,14 @@ async function bootstrapLibrary({ force = false } = {}) {
     setPlaylistStatus("error", "Erro ao carregar a playlist");
   } finally {
     profileCatalogLoading = false;
+    const activeProfile = getActiveProfile();
+    if ((pendingCatalogBootstrap || activeProfile !== profile) && activeProfile.library.length === 0) {
+      const retryWithForce = pendingCatalogBootstrap && force;
+      pendingCatalogBootstrap = false;
+      window.setTimeout(() => bootstrapLibrary({ force: retryWithForce }), 0);
+      return;
+    }
+    pendingCatalogBootstrap = false;
   }
 }
 
