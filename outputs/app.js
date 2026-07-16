@@ -1,6 +1,8 @@
 const APP_NAME = "M3UCINE";
 const STORAGE_KEY = "m3ucine-state-v1";
 const LEGACY_STORAGE_KEY = "calicine-iptv-v1";
+const LIBRARY_CACHE_KEY = "m3ucine-library-cache-v1";
+const LEGACY_LIBRARY_CACHE_KEY = "calicine-library-cache-v1";
 const HISTORY_KEY = "m3ucine-history-v1";
 const LEGACY_HISTORY_KEY = "calicine-iptv-history-v1";
 const PROGRESS_KEY = "m3ucine-progress-v1";
@@ -10,6 +12,7 @@ const MIN_CONTINUE_SECONDS = 8;
 const PLAYBACK_SAVE_INTERVAL_MS = 1000;
 const LIBRARY_FETCH_TIMEOUT_MS = 90000;
 const MAX_LIBRARY_ITEMS = 350000;
+const MAX_CACHED_LIBRARY_ITEMS = 25000;
 const PROFILE_SYNC_ENDPOINT = "/api/profile-state";
 const PROFILE_SYNC_DEBOUNCE_MS = 700;
 const AVATAR_SIZE = 512;
@@ -327,6 +330,103 @@ function createProfile(name, index = 0) {
   };
 }
 
+function compactLibraryItem(item) {
+  if (!item || typeof item !== "object") return null;
+  const id = String(item.id || item.url || item.title || "").trim();
+  const title = String(item.title || item.fullTitle || "").trim();
+  if (!id || !title) return null;
+  return {
+    id,
+    kind: item.kind || (item.type === "series" && !item.url ? "series" : item.type === "series" ? "episode" : "movie"),
+    title,
+    fullTitle: item.fullTitle || "",
+    group: item.group || "Geral",
+    type: item.type === "series" ? "series" : "movie",
+    url: item.url || "",
+    logo: item.logo || "",
+    source: item.source || "M3U",
+    base: item.base || "",
+    streamId: item.streamId || "",
+    seriesId: item.seriesId || "",
+    episodeId: item.episodeId || "",
+    seasonNumber: item.seasonNumber || null,
+    episodeNumber: item.episodeNumber || null,
+    plot: item.plot || "",
+    year: item.year || "",
+    genre: item.genre || "",
+    rating: item.rating || "",
+    duration: item.duration || "",
+    searchText: item.searchText || "",
+  };
+}
+
+function normalizeLibraryItems(items, limit = MAX_LIBRARY_ITEMS) {
+  if (!Array.isArray(items)) return [];
+  const compacted = [];
+  const seen = new Set();
+  for (const item of items) {
+    const compact = compactLibraryItem(item);
+    if (!compact || seen.has(compact.id)) continue;
+    seen.add(compact.id);
+    compacted.push(compact);
+    if (compacted.length >= limit) break;
+  }
+  return compacted;
+}
+
+function readLibraryCache() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LIBRARY_CACHE_KEY) || localStorage.getItem(LEGACY_LIBRARY_CACHE_KEY) || "null");
+    return raw && Array.isArray(raw.profiles) ? raw : { profiles: [] };
+  } catch {
+    return { profiles: [] };
+  }
+}
+
+function getCachedProfileLibrary(cache, profile, index) {
+  const entries = Array.isArray(cache?.profiles) ? cache.profiles : [];
+  const byId = profile?.id ? entries.find((entry) => entry.id === profile.id) : null;
+  const byName = profile?.name ? entries.find((entry) => entry.name === profile.name) : null;
+  const byIndex = entries[index] || null;
+  return normalizeLibraryItems((byId || byName || byIndex)?.library || [], MAX_CACHED_LIBRARY_ITEMS);
+}
+
+function writeLibraryCache(limit = MAX_CACHED_LIBRARY_ITEMS) {
+  const profilesWithLibrary = state.profiles
+    .map((profile, index) => ({
+      id: profile.id,
+      name: profile.name,
+      index,
+      library: normalizeLibraryItems(profile.library, limit),
+    }))
+    .filter((profile) => profile.library.length > 0);
+
+  if (!profilesWithLibrary.length) return;
+
+  const payload = JSON.stringify({
+    version: 1,
+    updatedAt: Date.now(),
+    profiles: profilesWithLibrary,
+  });
+
+  localStorage.setItem(LIBRARY_CACHE_KEY, payload);
+  localStorage.removeItem(LEGACY_LIBRARY_CACHE_KEY);
+}
+
+function saveLibraryCache() {
+  try {
+    writeLibraryCache(MAX_CACHED_LIBRARY_ITEMS);
+  } catch {
+    try {
+      writeLibraryCache(8000);
+    } catch {
+      try {
+        writeLibraryCache(3000);
+      } catch {}
+    }
+  }
+}
+
 function loadState() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || "null");
@@ -348,15 +448,18 @@ function loadState() {
 function normalizeState(input) {
   const sourceProfiles = Array.isArray(input.profiles) ? input.profiles : [];
   const source = sourceProfiles.length ? sourceProfiles.slice(0, MAX_PROFILES) : Array.from({ length: MAX_PROFILES });
+  const libraryCache = readLibraryCache();
   const profiles = source.map((sourceProfile, index) => {
     const profile = sourceProfile || sourceProfiles[index];
     const fallbackName = `Perfil ${index + 1}`;
+    const restoredLibrary = normalizeLibraryItems(profile?.library, MAX_CACHED_LIBRARY_ITEMS);
+    const cachedLibrary = restoredLibrary.length ? restoredLibrary : getCachedProfileLibrary(libraryCache, profile, index);
     return {
       id: profile?.id || uid(),
       name: profile?.name || fallbackName,
       avatar: normalizeAvatarValue(profile?.avatar, profile?.name || fallbackName),
       theme: normalizeProfileTheme(profile?.theme, index),
-      library: [],
+      library: cachedLibrary,
       favorites: Array.isArray(profile?.favorites) ? profile.favorites : [],
     };
   });
@@ -371,6 +474,7 @@ function normalizeState(input) {
 }
 
 function saveState() {
+  saveLibraryCache();
   const storedState = {
     activeProfileId: state.activeProfileId,
     profiles: state.profiles.map((profile, index) => ({
