@@ -516,13 +516,14 @@ body:not(.profile-gate) .profile-hero {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: var(--text);
-  font-family: "Arial Narrow", Impact, "Segoe UI", sans-serif;
-  font-size: clamp(24px, 3vw, 36px);
-  letter-spacing: 0.05em;
-  line-height: 0.9;
-  text-shadow: 0 0 18px rgba(66, 215, 255, 0.5), 0 0 54px rgba(7, 93, 255, 0.44);
+  font-family: "Arial Narrow", "Roboto Condensed", "Segoe UI", sans-serif;
+  font-size: clamp(32px, 3.2vw, 42px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 0.95;
+  text-shadow: 0 0 14px rgba(66, 215, 255, 0.24);
 }
 
 .eyebrow {
@@ -546,17 +547,24 @@ body:not(.profile-gate) .profile-hero {
 
 .profile-hero h2 {
   margin: 0;
-  font-size: clamp(28px, 4vw, 48px);
-  line-height: 1;
-  text-shadow: 0 0 34px rgba(66, 215, 255, 0.22);
+  color: #ffffff;
+  font-family: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+  font-size: clamp(28px, 3.5vw, 44px);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+  text-shadow: none;
   max-width: 100%;
   overflow-wrap: anywhere;
 }
 
 .profile-hero p {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: clamp(16px, 1.5vw, 20px);
+  margin: 5px 0 0;
+  color: #b8c8de;
+  font-family: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+  font-size: clamp(15px, 1.35vw, 18px);
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 .profile-grid {
@@ -671,13 +679,17 @@ body:not(.profile-gate) .profile-hero {
 
 .profile-card-copy {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
+  font-family: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
 }
 
 .profile-card strong {
   max-width: 100%;
-  font-size: clamp(0.96rem, 1.2vw, 1.14rem);
+  font-family: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+  font-size: clamp(17px, 1.25vw, 18px);
+  font-weight: 600;
+  letter-spacing: -0.012em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -686,7 +698,17 @@ body:not(.profile-gate) .profile-hero {
 .profile-card small,
 .profile-card-footer {
   color: #c8d8ec;
-  font-size: 0.82rem;
+  font-family: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+}
+
+.profile-card small {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.profile-card-footer {
+  font-size: 13px;
+  font-weight: 400;
 }
 
 .profile-mosaic {
@@ -2075,12 +2097,15 @@ body:not(.profile-gate) .episode-play-btn {
   }
 
   .profile-card strong {
-    font-size: 0.98rem;
+    font-size: 16px;
   }
 
-  .profile-card small,
+  .profile-card small {
+    font-size: 13px;
+  }
+
   .profile-card-footer {
-    font-size: 0.78rem;
+    font-size: 12.5px;
   }
 
   .profile-hero {
