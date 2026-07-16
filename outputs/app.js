@@ -17,6 +17,7 @@ const SEARCH_RENDER_DELAY_MS = 120;
 const MAX_SEARCH_RESULTS = 96;
 const MAX_PROFILES = 4;
 const PROFILE_THEMES = ["blue", "pink", "violet", "green"];
+const DEV_CATALOG_AUDIT = ["localhost", "127.0.0.1"].includes(location.hostname) || location.protocol === "file:";
 
 const els = {
   activeAvatar: document.getElementById("active-avatar"),
@@ -696,6 +697,315 @@ function normalizeText(value) {
     .toLowerCase();
 }
 
+function compactText(value) {
+  return normalizeText(value)
+    .replace(/[\[\](){}]/g, " ")
+    .replace(/[._]+/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stripCatalogNoise(value) {
+  return String(value || "")
+    .replace(/\[[^\]]*(?:2160p|1080p|720p|480p|4k|uhd|hdr|web[-\s]?dl|bluray|blu[-\s]?ray|hdtv|x264|x265|hevc|aac|dublado|legendado|dual|multi|netflix|disney|prime|hbo|max|amzn)[^\]]*\]/gi, " ")
+    .replace(/\([^)]*(?:2160p|1080p|720p|480p|4k|uhd|hdr|web[-\s]?dl|bluray|blu[-\s]?ray|hdtv|x264|x265|hevc|aac|dublado|legendado|dual|multi|netflix|disney|prime|hbo|max|amzn)[^)]*\)/gi, " ")
+    .replace(/\b(?:2160p|1080p|720p|480p|4k|uhd|hdr|web[-\s]?dl|bluray|blu[-\s]?ray|hdtv|x264|x265|hevc|aac|dublado|legendado|dual\s+audio|multi\s+audio|pt[-\s]?br|mp4|mkv|avi)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanupSeriesBaseTitle(value) {
+  return stripCatalogNoise(value)
+    .replace(/^[\s._\-–—:|]+|[\s._\-–—:|]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function looksLikeSeriesContext(title, group, item = {}) {
+  const haystack = compactText(`${title} ${group} ${item.source || ""} ${item.stream_type || ""}`);
+  return /\b(series|serie|seriado|temporada|season|episode|episodio|capitulo|anime|animes|desenho|desenhos|cartoon|dorama|novela)\b/.test(haystack);
+}
+
+function getTitleEpisodeInfo(title, group = "", item = {}) {
+  const rawTitle = stripCatalogNoise(title || "");
+  const normalizedSeparators = rawTitle.replace(/[._]+/g, " ");
+  const patterns = [
+    { regex: /(?:^|[\s\-–—:|])s(?:eason)?\s*0*(\d{1,3})\s*[\s\-–—:|]*e(?:p(?:isode)?)?\s*0*(\d{1,4})(?:\b|$)/i, confidence: "strong" },
+    { regex: /(?:^|[\s\-–—:|])t\s*0*(\d{1,3})\s*[\s\-–—:|]*e(?:p)?\s*0*(\d{1,4})(?:\b|$)/i, confidence: "strong" },
+    { regex: /(?:^|[\s\-–—:|])0*(\d{1,3})\s*x\s*0*(\d{1,4})(?:\b|$)/i, confidence: "strong" },
+    { regex: /(?:temporada|temp|season)\s*0*(\d{1,3}).{0,28}?(?:epis[oó]dio|episodio|episode|ep|cap[ií]tulo|capitulo)\s*0*(\d{1,4})/i, confidence: "strong" },
+  ];
+
+  for (const pattern of patterns) {
+    const match = normalizedSeparators.match(pattern.regex);
+    if (!match) continue;
+    const base = cleanupSeriesBaseTitle(normalizedSeparators.slice(0, match.index));
+    const tail = cleanupSeriesBaseTitle(normalizedSeparators.slice((match.index || 0) + match[0].length));
+    return {
+      baseTitle: base || cleanupSeriesBaseTitle(group) || rawTitle,
+      episodeTitle: tail || `Episodio ${Number(match[2]) || match[2]}`,
+      seasonNumber: Number(match[1]) || 1,
+      episodeNumber: Number(match[2]) || 0,
+      confidence: pattern.confidence,
+    };
+  }
+
+  const episodeOnly = normalizedSeparators.match(/(?:^|[\s\-–—:|])(?:ep(?:isode)?|epis[oó]dio|episodio|cap[ií]tulo|capitulo)\s*0*(\d{1,4})(?:\b|$)/i);
+  if (episodeOnly && looksLikeSeriesContext(title, group, item)) {
+    const base = cleanupSeriesBaseTitle(normalizedSeparators.slice(0, episodeOnly.index)) || cleanupSeriesBaseTitle(group);
+    const tail = cleanupSeriesBaseTitle(normalizedSeparators.slice((episodeOnly.index || 0) + episodeOnly[0].length));
+    return {
+      baseTitle: base || cleanupSeriesBaseTitle(group) || rawTitle,
+      episodeTitle: tail || `Episodio ${Number(episodeOnly[1]) || episodeOnly[1]}`,
+      seasonNumber: 1,
+      episodeNumber: Number(episodeOnly[1]) || 0,
+      confidence: "contextual",
+    };
+  }
+
+  return null;
+}
+
+function normalizeCatalogTitle(item) {
+  const title = item?.title || item?.name || "";
+  const group = item?.group || item?.category_name || "";
+  const parsed = getTitleEpisodeInfo(title, group, item);
+  const baseTitle = cleanupSeriesBaseTitle(parsed?.baseTitle || title || group || "Sem titulo");
+  return {
+    displayTitle: String(title || baseTitle || "Sem titulo").trim(),
+    baseTitle,
+    groupingKey: compactText(baseTitle),
+    episodeTitle: parsed?.episodeTitle || "",
+    seasonNumber: parsed?.seasonNumber || 0,
+    episodeNumber: parsed?.episodeNumber || 0,
+    confidence: parsed?.confidence || "none",
+  };
+}
+
+function scoreCatalogItem(item) {
+  let score = 0;
+  if (item?.id) score += 4;
+  if (item?.url) score += 5;
+  if (item?.logo) score += 3;
+  if (item?.plot) score += 2;
+  if (item?.seriesId || item?.episodeId || item?.streamId) score += 4;
+  if (item?.seasonNumber) score += 2;
+  if (item?.episodeNumber) score += 2;
+  return score;
+}
+
+function chooseBetterCatalogItem(current, candidate) {
+  if (!current) return candidate;
+  return scoreCatalogItem(candidate) > scoreCatalogItem(current) ? candidate : current;
+}
+
+function getMetadataEpisodeInfo(item, titleInfo) {
+  const seasonNumber = normalizeSeasonNumber(
+    item?.seasonNumber ?? item?.season ?? item?.season_number ?? item?.season_num ?? item?.info?.season ?? titleInfo.seasonNumber,
+    0
+  );
+  const episodeNumber =
+    normalizeEpisodeNumber(item) ||
+    readPositiveNumber(item?.episodeId) ||
+    readPositiveNumber(item?.episode_id) ||
+    titleInfo.episodeNumber ||
+    0;
+  return { seasonNumber, episodeNumber };
+}
+
+function classifyCatalogItem(item, titleInfo) {
+  const streamType = compactText(item?.stream_type || item?.streamType || item?.kind || "");
+  const hasSeriesId = Boolean(item?.seriesId || item?.series_id);
+  const hasEpisodeId = Boolean(item?.episodeId || item?.episode_id);
+  const hasPlayableUrl = Boolean(item?.url);
+  const metadata = getMetadataEpisodeInfo(item, titleInfo);
+  const explicitEpisode = hasEpisodeId || (metadata.episodeNumber > 0 && (metadata.seasonNumber > 0 || hasSeriesId));
+
+  if (item?.kind === "series" || (hasSeriesId && !hasPlayableUrl && streamType !== "episode")) return "series";
+  if (item?.kind === "episode" || explicitEpisode) return "episode";
+  if (streamType === "series" && !hasPlayableUrl) return "series";
+  if (streamType === "episode") return "episode";
+  if (titleInfo.confidence === "strong") return "episode";
+  if (titleInfo.confidence === "contextual" && (item?.type === "series" || looksLikeSeriesContext(item?.title, item?.group, item))) return "episode";
+  return "movie";
+}
+
+function makeLocalSeriesFromEpisode(episode, titleInfo, firstIndex) {
+  const baseTitle = titleInfo.baseTitle || episode.group || episode.title || "Serie";
+  const seriesKey = titleInfo.groupingKey || compactText(baseTitle);
+  const seriesId = episode.seriesId || `local-${stableId(seriesKey)}`;
+  return {
+    id: `series-${seriesId}`,
+    kind: "series",
+    title: baseTitle,
+    group: episode.group || "Series",
+    type: "series",
+    url: "",
+    logo: episode.logo || "",
+    source: episode.source || "M3U",
+    base: episode.base || "",
+    seriesId,
+    plot: episode.plot || "",
+    year: episode.year || "",
+    genre: episode.genre || "",
+    localSeasons: [],
+    originalIndex: firstIndex,
+  };
+}
+
+function normalizeCatalogEpisode(item, seriesItem, titleInfo, metadata) {
+  const seasonNumber = metadata.seasonNumber || titleInfo.seasonNumber || 1;
+  const episodeNumber = metadata.episodeNumber || titleInfo.episodeNumber || 0;
+  const episodeTitle = titleInfo.episodeTitle || item.episodeTitle || item.name || `Episodio ${episodeNumber || ""}`.trim();
+  return {
+    ...item,
+    id: item.id || stableId(`${seriesItem.id}|${seasonNumber}|${episodeNumber}|${item.url || item.title}`),
+    kind: "episode",
+    type: "series",
+    title: episodeTitle,
+    fullTitle: item.fullTitle || item.title || `${seriesItem.title} - T${seasonNumber} EP${episodeNumber || ""}`,
+    group: seriesItem.title,
+    seriesTitle: seriesItem.title,
+    logo: item.logo || seriesItem.logo || "",
+    seriesId: seriesItem.seriesId,
+    seasonNumber,
+    episodeNumber,
+    episodeId: item.episodeId || item.episode_id || item.streamId || "",
+    plot: item.plot || "",
+    duration: item.duration || "",
+    releaseDate: item.releaseDate || item.releasedate || "",
+    progressKey: item.progressKey || buildPlaybackKey({ ...item, seasonNumber, episodeNumber }),
+  };
+}
+
+function addEpisodeToSeason(seriesItem, episode, audit) {
+  const seasonNumber = Number.isFinite(episode.seasonNumber) ? episode.seasonNumber : 1;
+  let season = seriesItem.localSeasons.find((entry) => entry.seasonNumber === seasonNumber);
+  if (!season) {
+    season = { seasonNumber, name: seasonNumber === 0 ? "Especiais" : `Temporada ${seasonNumber || 1}`, episodes: [] };
+    seriesItem.localSeasons.push(season);
+  }
+  const duplicateIndex = season.episodes.findIndex((entry) => {
+    const sameNumber = episode.episodeNumber && entry.episodeNumber === episode.episodeNumber;
+    const sameUrl = episode.url && entry.url === episode.url;
+    const sameTitle = compactText(entry.fullTitle || entry.title) === compactText(episode.fullTitle || episode.title);
+    return sameUrl || (sameNumber && sameTitle);
+  });
+  if (duplicateIndex >= 0) {
+    season.episodes[duplicateIndex] = chooseBetterCatalogItem(season.episodes[duplicateIndex], episode);
+    audit.duplicatesRemoved += 1;
+    return;
+  }
+  season.episodes.push(episode);
+}
+
+function finalizeLocalSeries(seriesItem) {
+  seriesItem.localSeasons = seriesItem.localSeasons
+    .filter((season) => season.episodes.length > 0)
+    .sort((a, b) => a.seasonNumber - b.seasonNumber)
+    .map((season) => ({
+      ...season,
+      episodes: season.episodes.sort(
+        (a, b) => (a.episodeNumber || 99999) - (b.episodeNumber || 99999) || (a.fullTitle || a.title).localeCompare(b.fullTitle || b.title)
+      ),
+    }));
+  seriesItem.localEpisodeCount = seriesItem.localSeasons.reduce((total, season) => total + season.episodes.length, 0);
+  seriesItem.searchText = `${seriesItem.title} ${seriesItem.group} ${seriesItem.genre || ""}`;
+  return seriesItem;
+}
+
+function auditAndOrganizeCatalog(rawItems) {
+  const audit = {
+    input: rawItems.length,
+    movies: 0,
+    series: 0,
+    seasons: 0,
+    episodes: 0,
+    movieEpisodesFixed: 0,
+    duplicatesRemoved: 0,
+    uncertain: 0,
+  };
+  const movies = [];
+  const movieKeys = new Map();
+  const seriesMap = new Map();
+  const passthroughSeries = [];
+
+  rawItems.forEach((item, index) => {
+    const titleInfo = normalizeCatalogTitle(item);
+    const classification = classifyCatalogItem(item, titleInfo);
+
+    if (classification === "series") {
+      passthroughSeries.push({ ...item, originalIndex: index });
+      return;
+    }
+
+    if (classification === "episode") {
+      if (item.type === "movie" || item.kind === "movie") audit.movieEpisodesFixed += 1;
+      const metadata = getMetadataEpisodeInfo(item, titleInfo);
+      const baseTitle = titleInfo.baseTitle || item.group || item.title || "Serie";
+      const groupingKey = item.seriesId || item.series_id
+        ? `api-${item.seriesId || item.series_id}`
+        : titleInfo.groupingKey || compactText(baseTitle);
+      if (!groupingKey) {
+        audit.uncertain += 1;
+        movies.push(item);
+        return;
+      }
+      let seriesItem = seriesMap.get(groupingKey);
+      if (!seriesItem) {
+        seriesItem = makeLocalSeriesFromEpisode(item, { ...titleInfo, baseTitle, groupingKey }, index);
+        seriesMap.set(groupingKey, seriesItem);
+      } else {
+        seriesItem.logo = seriesItem.logo || item.logo || "";
+        seriesItem.plot = seriesItem.plot || item.plot || "";
+      }
+      addEpisodeToSeason(seriesItem, normalizeCatalogEpisode(item, seriesItem, titleInfo, metadata), audit);
+      return;
+    }
+
+    if (item.type === "series" && item.url && titleInfo.confidence === "none") {
+      audit.uncertain += 1;
+    }
+    const movieKey = item.id || item.url || compactText(`${item.title}|${item.group}`);
+    if (movieKeys.has(movieKey)) {
+      const existingIndex = movieKeys.get(movieKey);
+      movies[existingIndex] = chooseBetterCatalogItem(movies[existingIndex], item);
+      audit.duplicatesRemoved += 1;
+      return;
+    }
+    movieKeys.set(movieKey, movies.length);
+    movies.push({ ...item, kind: item.kind || "movie", type: "movie", originalIndex: index });
+  });
+
+  for (const seriesItem of passthroughSeries) {
+    const titleInfo = normalizeCatalogTitle(seriesItem);
+    const key = seriesItem.seriesId ? `api-${seriesItem.seriesId}` : titleInfo.groupingKey || compactText(seriesItem.title);
+    if (seriesMap.has(key)) {
+      const grouped = seriesMap.get(key);
+      grouped.logo = chooseBetterCatalogItem(grouped, seriesItem).logo || grouped.logo;
+      grouped.plot = grouped.plot || seriesItem.plot || "";
+      audit.duplicatesRemoved += 1;
+      continue;
+    }
+    seriesMap.set(key, { ...seriesItem, localSeasons: Array.isArray(seriesItem.localSeasons) ? seriesItem.localSeasons : [] });
+  }
+
+  const seriesItems = Array.from(seriesMap.values())
+    .map((seriesItem) => (seriesItem.localSeasons?.length ? finalizeLocalSeries(seriesItem) : seriesItem))
+    .filter((seriesItem) => seriesItem.kind === "series");
+  audit.movies = movies.length;
+  audit.series = seriesItems.length;
+  audit.seasons = seriesItems.reduce((total, item) => total + (item.localSeasons?.length || 0), 0);
+  audit.episodes = seriesItems.reduce((total, item) => total + (item.localEpisodeCount || 0), 0);
+
+  const items = [...movies, ...seriesItems].sort((a, b) => (a.originalIndex ?? 0) - (b.originalIndex ?? 0));
+  if (DEV_CATALOG_AUDIT) {
+    console.info("[M3UCINE] Auditoria do catalogo", audit);
+  }
+  return { items, audit };
+}
+
 function parseAttributes(text) {
   const attrs = {};
   const regex = /([a-z0-9-]+)="([^"]*)"/gi;
@@ -758,6 +1068,14 @@ function parseM3U(text) {
   return items;
 }
 
+if (DEV_CATALOG_AUDIT) {
+  window.__m3ucineCatalogTools = {
+    parseM3U,
+    auditAndOrganizeCatalog,
+    normalizeCatalogTitle,
+  };
+}
+
 function withTimeout(promise, ms, label) {
   return Promise.race([
     promise,
@@ -783,7 +1101,9 @@ async function fetchDefaultM3uText() {
 }
 
 function importItemsIntoProfile(profile, items) {
-  profile.library = items.slice(0, MAX_LIBRARY_ITEMS);
+  const organized = auditAndOrganizeCatalog(items.slice(0, MAX_LIBRARY_ITEMS));
+  profile.library = organized.items.slice(0, MAX_LIBRARY_ITEMS);
+  profile.catalogAudit = organized.audit;
   profile.favorites = profile.favorites.filter((favoriteId) =>
     profile.library.some((item) => item.id === favoriteId)
   );
@@ -803,7 +1123,7 @@ function matchesGroupFilter(item) {
 function getItemSearchIndex(item) {
   const cached = searchIndexCache.get(item);
   if (cached) return cached;
-  const value = normalizeText(`${item.title} ${item.group} ${item.type} ${item.source || ""}`);
+  const value = normalizeText(`${item.title} ${item.group} ${item.type} ${item.source || ""} ${item.searchText || ""}`);
   searchIndexCache.set(item, value);
   return value;
 }
@@ -1618,6 +1938,14 @@ function renderSeriesDetails() {
 async function loadSeriesDetails(seriesItem, force = false) {
   const seriesId = getSeriesIdentity(seriesItem);
   if (!seriesId) throw new Error("Series ID indisponivel.");
+  if (Array.isArray(seriesItem.localSeasons) && seriesItem.localSeasons.length) {
+    const normalized = {
+      series: seriesItem,
+      seasons: seriesItem.localSeasons,
+    };
+    seriesDetailsCache.set(seriesId, normalized);
+    return normalized;
+  }
   if (!force && seriesDetailsCache.has(seriesId)) return seriesDetailsCache.get(seriesId);
   if (seriesDetailsLoading.has(seriesId)) return seriesDetailsLoading.get(seriesId);
 
