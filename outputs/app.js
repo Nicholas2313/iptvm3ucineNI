@@ -94,7 +94,6 @@ const els = {
   recommendedGrid: document.getElementById("recommended-grid"),
   similarGrid: document.getElementById("similar-grid"),
   playlistStatus: document.getElementById("playlist-status"),
-  playlistRetryBtn: document.getElementById("playlist-retry-btn"),
   catalogStatus: document.getElementById("catalog-status"),
   catalogSource: document.getElementById("catalog-source"),
   clearHistory: document.getElementById("clear-history"),
@@ -1202,6 +1201,13 @@ function getItemSearchIndex(item) {
   return value;
 }
 
+function getMediaPlaybackUrl(item) {
+  const rawUrl = String(item?.url || "").trim();
+  if (!rawUrl) return "";
+  if (rawUrl.startsWith("/") || rawUrl.startsWith(location.origin)) return rawUrl;
+  return `/api/stream?url=${encodeURIComponent(rawUrl)}`;
+}
+
 function getVisibleItems(profile, favoriteSet = new Set(profile.favorites)) {
   const library = getCurrentLibrary(profile);
   const query = normalizeText(searchTerm);
@@ -1251,10 +1257,6 @@ function setPlaylistStatus(state, message) {
   if (els.catalogStatus) {
     els.catalogStatus.textContent = message || fallbackMessage;
     els.catalogStatus.dataset.tone = state === "error" ? "bad" : state === "loaded" ? "good" : "loading";
-  }
-  if (els.playlistRetryBtn) {
-    els.playlistRetryBtn.hidden = state !== "error";
-    els.playlistRetryBtn.disabled = state === "loading";
   }
 }
 
@@ -2547,14 +2549,15 @@ function updatePlayer(profile, item) {
     progressKey: buildPlaybackKey(item),
   };
   lastPlaybackSaveAt = 0;
-  els.player.src = item.url;
+  const mediaUrl = getMediaPlaybackUrl(item);
+  els.player.src = mediaUrl;
   els.player.load();
   if (els.downloadLink) {
-    els.downloadLink.href = item.url;
+    els.downloadLink.href = mediaUrl;
     els.downloadLink.textContent = "Baixar";
     els.downloadLink.removeAttribute("aria-disabled");
   }
-  if (els.openLink) els.openLink.onclick = () => window.open(item.url, "_blank", "noopener,noreferrer");
+  if (els.openLink) els.openLink.onclick = () => window.open(mediaUrl, "_blank", "noopener,noreferrer");
 }
 
 function selectItem(itemId, profile = getActiveProfile()) {
@@ -2645,18 +2648,19 @@ function updateStreamingPlayer(profile, item) {
     progressKey: buildPlaybackKey(item),
   };
   lastPlaybackSaveAt = 0;
-  if (els.player.getAttribute("src") !== item.url) {
+  const mediaUrl = getMediaPlaybackUrl(item);
+  if (els.player.getAttribute("src") !== mediaUrl) {
     clearTimeout(playbackSaveTimer);
     playbackSaveTimer = null;
-    els.player.src = item.url;
+    els.player.src = mediaUrl;
     els.player.load();
   }
   if (els.downloadLink) {
-    els.downloadLink.href = item.url;
+    els.downloadLink.href = mediaUrl;
     els.downloadLink.removeAttribute("aria-disabled");
   }
   if (els.openLink) {
-    els.openLink.onclick = () => window.open(item.url, "_blank", "noopener,noreferrer");
+    els.openLink.onclick = () => window.open(mediaUrl, "_blank", "noopener,noreferrer");
   }
 }
 
@@ -2909,10 +2913,6 @@ els.profileGrid?.addEventListener("click", (event) => {
 els.editProfileBtn?.addEventListener("click", () => {
   profileManageMode = !profileManageMode;
   render();
-});
-
-els.playlistRetryBtn?.addEventListener("click", () => {
-  bootstrapLibrary({ force: true });
 });
 
 els.exitBtn?.addEventListener("click", () => {

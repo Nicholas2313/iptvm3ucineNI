@@ -1,4 +1,5 @@
 import http from "node:http";
+import { Readable } from "node:stream";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -120,6 +121,92 @@ function contentTypeFor(filePath) {
   return types.get(path.extname(filePath).toLowerCase()) || "application/octet-stream";
 }
 
+function isHttpUrl(value) {
+  try {
+    const target = new URL(value);
+    return target.protocol === "http:" || target.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function mediaContentType(target, upstreamType = "") {
+  if (upstreamType) return upstreamType;
+  const extension = path.extname(new URL(target).pathname).toLowerCase();
+  if (extension === ".mp4") return "video/mp4";
+  if (extension === ".m3u8") return "application/vnd.apple.mpegurl";
+  if (extension === ".ts" || extension === ".mpegts") return "video/mp2t";
+  if (extension === ".mkv") return "video/x-matroska";
+  if (extension === ".avi") return "video/x-msvideo";
+  return "application/octet-stream";
+}
+
+async function proxyMediaStream(req, res, target) {
+  if (!isHttpUrl(target)) {
+    return send(res, 400, "Invalid media url");
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), upstreamTimeoutMs * 2);
+
+  try {
+    const headers = {
+      "User-Agent": "Mozilla/5.0 M3UCINE/1.0",
+      Accept: "*/*",
+    };
+    if (req.headers.range) {
+      headers.Range = req.headers.range;
+    }
+
+    const upstream = await fetch(target, {
+      headers,
+      redirect: "follow",
+      signal: controller.signal,
+    });
+
+    if (!upstream.ok && upstream.status !== 206) {
+      const text = await upstream.text().catch(() => "");
+      return send(res, upstream.status || 502, text || `Media HTTP ${upstream.status}`);
+    }
+
+    const responseHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,HEAD,OPTIONS",
+      "Access-Control-Allow-Headers": "Range, Content-Type",
+      "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
+      "Cache-Control": "no-store",
+      "Content-Type": mediaContentType(target, upstream.headers.get("content-type") || ""),
+    };
+
+    for (const header of ["content-length", "content-range", "accept-ranges", "last-modified", "etag"]) {
+      const value = upstream.headers.get(header);
+      if (value) responseHeaders[header] = value;
+    }
+
+    if (!responseHeaders["accept-ranges"]) {
+      responseHeaders["Accept-Ranges"] = "bytes";
+    }
+
+    res.writeHead(req.method === "HEAD" ? 200 : upstream.status, responseHeaders);
+    if (req.method === "HEAD") {
+      return res.end();
+    }
+
+    if (!upstream.body) {
+      return res.end();
+    }
+
+    Readable.fromWeb(upstream.body).pipe(res);
+  } catch (error) {
+    if (!res.headersSent) {
+      return send(res, 502, error && error.name === "AbortError" ? "Media timeout" : "Media proxy failed");
+    }
+    res.destroy(error);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchM3u(target) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), upstreamTimeoutMs);
@@ -136,6 +223,11 @@ async function fetchM3u(target) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function looksLikeM3u(text) {
+  const source = String(text || "");
+  return /^#EXTM3U/im.test(source) && /#EXTINF:/i.test(source) && /^https?:\/\//im.test(source);
 }
 
 async function fetchText(target) {
@@ -158,7 +250,12 @@ async function fetchFirstWorkingM3u(targets) {
     try {
       const response = await fetchM3u(target);
       if (response.ok) {
-        return { response, target };
+        const text = await response.text();
+        if (looksLikeM3u(text)) {
+          return { text, target };
+        }
+        errors.push(`${target} -> resposta sem M3U`);
+        continue;
       }
       errors.push(`${target} -> HTTP ${response.status}`);
     } catch (error) {
@@ -166,7 +263,7 @@ async function fetchFirstWorkingM3u(targets) {
     }
   }
 
-  return { response: null, target: null, errors };
+  return { text: "", target: null, errors };
 }
 
 function uniqueById(items) {
@@ -529,13 +626,12 @@ async function fetchFirstWorkingXtreamLibrary() {
 
 async function fetchFirstWorkingM3uLibrary() {
   const result = await fetchFirstWorkingM3u(defaultM3uUrls);
-  if (!result.response) {
+  if (!result.text) {
     return { items: [], base: null, errors: result.errors };
   }
 
-  const text = await result.response.text();
   return {
-    items: parseM3uLibrary(text, result.target),
+    items: parseM3uLibrary(result.text, result.target),
     base: result.target,
     errors: [],
   };
@@ -614,15 +710,22 @@ const server = http.createServer(async (req, res) => {
       }
 
       const result = await fetchFirstWorkingM3u(targets);
-      if (!result.response) {
+      if (!result.text) {
         return send(res, 502, `No M3U source worked: ${result.errors.join("; ")}`);
       }
 
-      const text = await result.response.text();
-      return send(res, 200, text, {
+      return send(res, 200, result.text, {
         "Content-Type": "text/plain; charset=utf-8",
         "X-M3UCINE-Source": result.target,
       });
+    }
+
+    if (requestUrl.pathname === "/api/stream") {
+      const target = requestUrl.searchParams.get("url") || "";
+      if (!target) {
+        return send(res, 400, "Missing url parameter");
+      }
+      return proxyMediaStream(req, res, target);
     }
 
     if (requestUrl.pathname === "/api/default-library") {

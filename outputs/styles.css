@@ -330,6 +330,7 @@ video {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: nowrap;
   gap: 8px;
   max-width: min(100%, 460px);
   min-height: 34px;
@@ -382,31 +383,6 @@ body:not(.profile-gate) .main-playlist-status {
 
 .playlist-status:not([data-state="loading"]) .playlist-spinner {
   display: none;
-}
-
-.playlist-retry-btn {
-  min-height: 28px;
-  padding: 5px 10px;
-  border: 1px solid rgba(255, 176, 186, 0.3);
-  border-radius: 999px;
-  color: #ffd9df;
-  background: rgba(255, 89, 106, 0.12);
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
-  transition: transform 150ms ease, opacity 150ms ease, background 150ms ease;
-}
-
-.playlist-retry-btn:hover,
-.playlist-retry-btn:focus-visible {
-  transform: translateY(-1px);
-  background: rgba(255, 89, 106, 0.18);
-}
-
-.playlist-status[data-state="error"] .playlist-retry-btn {
-  flex-basis: 100%;
-  width: fit-content;
-  margin: 2px auto 0;
 }
 
 @keyframes playlist-spin {
