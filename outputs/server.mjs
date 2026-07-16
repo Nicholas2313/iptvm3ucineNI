@@ -7,13 +7,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = __dirname;
 const port = Number(process.env.PORT || 10000);
-const upstreamTimeoutMs = Number(process.env.UPSTREAM_TIMEOUT_MS || 15000);
+const upstreamTimeoutMs = Number(process.env.UPSTREAM_TIMEOUT_MS || 25000);
 const appName = process.env.APP_NAME || "M3UCINE";
 const xtreamUser = process.env.XTREAM_USER || "50971241";
 const xtreamPassword = process.env.XTREAM_PASSWORD || "91170499";
-const maxTotalLibraryItems = Number(process.env.MAX_TOTAL_LIBRARY_ITEMS || 20000);
-const maxMovieItems = Number(process.env.MAX_MOVIE_ITEMS || 20000);
-const maxSeriesItems = Number(process.env.MAX_SERIES_ITEMS || 10000);
+const maxTotalLibraryItems = Number(process.env.MAX_TOTAL_LIBRARY_ITEMS || 350000);
+const maxMovieItems = Number(process.env.MAX_MOVIE_ITEMS || 350000);
+const maxSeriesItems = Number(process.env.MAX_SERIES_ITEMS || 350000);
 const profileStateFile = process.env.PROFILE_STATE_FILE || path.join(root, "..", ".m3ucine-profile-state.json");
 const profileThemes = new Set(["blue", "pink", "violet", "green"]);
 const xtreamBases = (
@@ -177,6 +177,87 @@ function uniqueById(items) {
     seen.add(key);
     return true;
   });
+}
+
+function stableId(value) {
+  let hash = 0;
+  const text = String(value || "");
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash << 5) - hash + text.charCodeAt(index);
+    hash |= 0;
+  }
+  return `m3u-${Math.abs(hash).toString(36)}`;
+}
+
+function normalizeText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function parseAttributes(text) {
+  const attrs = {};
+  const regex = /([a-z0-9-]+)="([^"]*)"/gi;
+  let match;
+  while ((match = regex.exec(text))) {
+    attrs[match[1].toLowerCase()] = match[2];
+  }
+  return attrs;
+}
+
+function detectM3uType(title, group) {
+  const haystack = normalizeText(`${title} ${group}`);
+  if (/(canal|canais|live|ao vivo|channel|iptv|tv ao vivo|broadcast)/i.test(haystack)) return null;
+  if (/(serie|series|season|episode|episodio|episodios|show|capitulo)/i.test(haystack)) return "series";
+  if (/(filme|filmes|movie|movies|vod|cinema)/i.test(haystack)) return "movie";
+  return "movie";
+}
+
+function parseM3uLibrary(text, sourceUrl = "") {
+  const lines = String(text || "").split(/\r?\n/);
+  const items = [];
+  let current = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    if (line.startsWith("#EXTINF:")) {
+      const commaIndex = line.indexOf(",");
+      const rawMeta = commaIndex >= 0 ? line.slice(0, commaIndex) : line;
+      const rawTitle = commaIndex >= 0 ? line.slice(commaIndex + 1).trim() : "";
+      const attrs = parseAttributes(rawMeta);
+      const title = rawTitle || attrs["tvg-name"] || "Sem titulo";
+      const group = attrs["group-title"] || "Geral";
+      const type = detectM3uType(title, group);
+      current = type
+        ? {
+            id: "",
+            kind: type === "series" ? "episode" : "movie",
+            title,
+            group,
+            type,
+            url: "",
+            logo: attrs["tvg-logo"] || "",
+            source: "M3U",
+            base: sourceUrl,
+          }
+        : null;
+      continue;
+    }
+
+    if (line.startsWith("#")) continue;
+
+    if (current && !current.url) {
+      current.url = line;
+      current.id = stableId(`${current.title}|${current.group}|${current.url}`);
+      items.push(current);
+      current = null;
+    }
+  }
+
+  return uniqueById(items).slice(0, maxTotalLibraryItems);
 }
 
 function makeMovieUrl(base, stream) {
@@ -392,15 +473,14 @@ async function fetchXtreamLibraryFromBase(base) {
   const series = seriesResult.status === "fulfilled" ? seriesResult.value : [];
   const items = [];
   const selectedSeries = Array.isArray(series)
-    ? uniqueById(series.slice(0, Math.min(maxSeriesItems, maxTotalLibraryItems)).map((show) => normalizeSeriesShow(base, show)))
+    ? uniqueById(series.map((show) => normalizeSeriesShow(base, show))).slice(0, maxSeriesItems)
     : [];
-  const movieLimit = Math.max(0, Math.min(maxMovieItems, maxTotalLibraryItems - selectedSeries.length));
+  const selectedMovies = Array.isArray(movies)
+    ? uniqueById(movies.map((stream) => normalizeMovie(base, stream))).slice(0, maxMovieItems)
+    : [];
 
-  if (Array.isArray(movies)) {
-    items.push(...uniqueById(movies.slice(0, movieLimit).map((stream) => normalizeMovie(base, stream))));
-  }
-
-  items.push(...selectedSeries);
+  for (const item of selectedMovies) items.push(item);
+  for (const item of selectedSeries) items.push(item);
 
   if (!items.length) {
     throw new Error(
@@ -413,7 +493,7 @@ async function fetchXtreamLibraryFromBase(base) {
     );
   }
 
-  return items;
+  return uniqueById(items).slice(0, maxTotalLibraryItems);
 }
 
 async function fetchXtreamSeriesInfoFromBase(base, seriesId) {
@@ -425,12 +505,17 @@ async function fetchXtreamSeriesInfoFromBase(base, seriesId) {
 
 async function fetchFirstWorkingXtreamLibrary() {
   const errors = [];
+  const mergedItems = [];
+  const workingBases = [];
 
   for (const base of xtreamBases) {
     try {
       const items = await fetchXtreamLibraryFromBase(base);
       if (items.length) {
-        return { items, base };
+        for (const item of items) mergedItems.push(item);
+        workingBases.push(base);
+        if (mergedItems.length >= maxTotalLibraryItems) break;
+        continue;
       }
       errors.push(`${base} -> sem itens`);
     } catch (error) {
@@ -438,7 +523,44 @@ async function fetchFirstWorkingXtreamLibrary() {
     }
   }
 
-  return { items: [], base: null, errors };
+  const items = uniqueById(mergedItems).slice(0, maxTotalLibraryItems);
+  return { items, base: workingBases.join("|") || null, errors };
+}
+
+async function fetchFirstWorkingM3uLibrary() {
+  const result = await fetchFirstWorkingM3u(defaultM3uUrls);
+  if (!result.response) {
+    return { items: [], base: null, errors: result.errors };
+  }
+
+  const text = await result.response.text();
+  return {
+    items: parseM3uLibrary(text, result.target),
+    base: result.target,
+    errors: [],
+  };
+}
+
+async function fetchMaximumDefaultLibrary() {
+  const [m3uResult, xtreamResult] = await Promise.allSettled([
+    fetchFirstWorkingM3uLibrary(),
+    fetchFirstWorkingXtreamLibrary(),
+  ]);
+  const m3u = m3uResult.status === "fulfilled" ? m3uResult.value : { items: [], base: null, errors: [m3uResult.reason?.message || "M3U falhou"] };
+  const xtream = xtreamResult.status === "fulfilled" ? xtreamResult.value : { items: [], base: null, errors: [xtreamResult.reason?.message || "Xtream falhou"] };
+  const merged = [];
+
+  for (const item of m3u.items || []) merged.push(item);
+  for (const item of (xtream.items || []).filter((item) => item.type === "series" && item.kind === "series")) merged.push(item);
+  if (!m3u.items?.length) {
+    for (const item of xtream.items || []) merged.push(item);
+  }
+
+  return {
+    items: uniqueById(merged).slice(0, maxTotalLibraryItems),
+    base: [m3u.base, xtream.base].filter(Boolean).join("|") || null,
+    errors: [...(m3u.errors || []), ...(xtream.errors || [])],
+  };
 }
 
 async function fetchFirstWorkingSeriesInfo(seriesId, baseHint) {
@@ -504,9 +626,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (requestUrl.pathname === "/api/default-library") {
-      const result = await fetchFirstWorkingXtreamLibrary();
+      const result = await fetchMaximumDefaultLibrary();
       if (!result.items.length) {
-        return send(res, 502, `No Xtream source worked: ${result.errors.join("; ")}`);
+        return send(res, 502, `No M3U/Xtream source worked: ${result.errors.join("; ")}`);
       }
 
       return send(res, 200, JSON.stringify(result.items), {

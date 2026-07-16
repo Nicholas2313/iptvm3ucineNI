@@ -8,8 +8,8 @@ const LAST_M3U_URL_KEY = "m3ucine-last-m3u-url";
 const LEGACY_LAST_M3U_URL_KEY = "calicine-iptv-last-m3u-url";
 const MIN_CONTINUE_SECONDS = 8;
 const PLAYBACK_SAVE_INTERVAL_MS = 1000;
-const LIBRARY_FETCH_TIMEOUT_MS = 45000;
-const MAX_LIBRARY_ITEMS = 20000;
+const LIBRARY_FETCH_TIMEOUT_MS = 90000;
+const MAX_LIBRARY_ITEMS = 350000;
 const PROFILE_SYNC_ENDPOINT = "/api/profile-state";
 const PROFILE_SYNC_DEBOUNCE_MS = 700;
 const AVATAR_SIZE = 512;
@@ -734,6 +734,7 @@ function parseM3U(text) {
       }
       current = {
         id: "",
+        kind: type === "series" ? "episode" : "movie",
         title,
         group,
         type,
@@ -1014,7 +1015,7 @@ function renderHistory(profile) {
 function renderCard(item, profile) {
   const isFavorite = profile.favorites.includes(item.id);
   const selected = item.id === selectedItemId;
-  const primaryAction = item.type === "series" ? "Episodios" : "Assistir";
+  const primaryAction = item.kind === "series" ? "Episodios" : "Assistir";
   return `
     <article class="media-card ${selected ? "selected" : ""}" data-item-id="${item.id}">
       <img class="poster" src="${item.logo || defaultAvatar(item.title)}" alt="${escapeHtml(item.title)}" width="210" height="315" loading="lazy" />
@@ -1034,7 +1035,7 @@ function renderCard(item, profile) {
 function renderStreamingCard(item, profile) {
   const isFavorite = profile.favorites.includes(item.id);
   const selected = item.id === selectedItemId;
-  const primaryAction = item.type === "series" ? "Temporadas" : "Assistir";
+  const primaryAction = item.kind === "series" ? "Temporadas" : "Assistir";
   const poster = item.logo || defaultAvatar(item.title);
   return `
     <article class="media-card ${selected ? "selected" : ""}" data-item-id="${escapeHtml(item.id)}">
@@ -1861,7 +1862,7 @@ function getHeroTitle(item) {
 function getEpisodeDisplayTitle(item) {
   if (!item) return "Escolha um conteudo para comecar";
   if (item.kind !== "episode") {
-    return item.type === "series" ? "Escolha uma temporada" : item.group || "Pronto para assistir";
+    return item.kind === "series" ? "Escolha uma temporada" : item.group || "Pronto para assistir";
   }
   return item.episodeTitle || item.name || item.title || `Episodio ${item.episodeNumber || ""}`;
 }
@@ -1993,7 +1994,7 @@ function updateHero(profile, item) {
   els.heroHeadline.textContent = item.title;
   els.heroMeta.textContent = `${item.group || "Geral"} · ${item.type === "series" ? "Series" : "Filme"}`;
   els.heroDescription.textContent =
-    item.type === "series"
+    item.kind === "series"
       ? "Abra a série para ver temporadas e episódios organizados."
       : "Clique para continuar a reprodução ou voltar do ponto salvo.";
 }
@@ -2037,7 +2038,7 @@ function updatePlayer(profile, item) {
 function selectItem(itemId, profile = getActiveProfile()) {
   const item = profile.library.find((entry) => entry.id === itemId);
   if (!item) return;
-  if (item.kind === "series" || item.type === "series") {
+  if (item.kind === "series") {
     selectedItemId = item.id;
     updateHero(profile, item);
     updatePlayer(profile, null);
@@ -2082,7 +2083,7 @@ function updateStreamingHero(profile, item) {
   if (els.heroEpisodeTitle) els.heroEpisodeTitle.textContent = getEpisodeDisplayTitle(item);
   els.heroDescription.textContent = getHeroDescription(item);
   if (els.heroContinueBtn) {
-    els.heroContinueBtn.textContent = item.kind === "series" || item.type === "series" ? "Escolher temporada" : "Continuar assistindo";
+    els.heroContinueBtn.textContent = item.kind === "series" ? "Escolher temporada" : "Continuar assistindo";
     els.heroContinueBtn.disabled = false;
   }
   if (els.heroFavoriteBtn) {
@@ -2103,7 +2104,7 @@ function updateStreamingPlayer(profile, item) {
     els.player.removeAttribute("src");
     els.player.load();
     els.playerEmpty.style.display = "grid";
-    els.playerEmpty.textContent = item && (item.kind === "series" || item.type === "series")
+    els.playerEmpty.textContent = item && item.kind === "series"
       ? "Escolha uma temporada e um episodio"
       : "Nenhuma midia selecionada";
     if (els.downloadLink) {
@@ -2142,7 +2143,7 @@ function selectStreamingItem(itemId, profile = getActiveProfile()) {
   selectedItemId = item.id;
   rememberItem(item.id);
 
-  if (item.kind === "series" || item.type === "series") {
+  if (item.kind === "series") {
     activePlayback = null;
     playbackRestoreTime = 0;
     inlineSeriesState = {
@@ -2543,7 +2544,7 @@ els.heroContinueBtn?.addEventListener("click", () => {
     els.searchInput?.focus();
     return;
   }
-  if (item.kind === "series" || item.type === "series") {
+  if (item.kind === "series") {
     if (!inlineSeriesState.seriesItem || inlineSeriesState.seriesItem.id !== item.id) loadInlineSeriesDetails(item);
     els.playerSeasonsSection?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
