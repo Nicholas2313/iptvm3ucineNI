@@ -894,9 +894,9 @@ function getProfileMosaicItems(profile, index = 0) {
     .slice(0, 24)
     .forEach((item) => addMosaicItem(items, seen, item, "Recomendado"));
 
-  if (items.length) return items.slice(0, 6);
+  if (items.length) return items.slice(0, 3);
 
-  return Array.from({ length: 4 }, (_, fallbackIndex) => ({
+  return Array.from({ length: 3 }, (_, fallbackIndex) => ({
     logo: fallbackPoster(profile.theme, fallbackIndex + index),
     title: "Arte M3UCINE",
     label: "Sem conteúdo salvo",
