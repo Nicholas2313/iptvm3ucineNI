@@ -13,7 +13,7 @@ const MAX_LIBRARY_ITEMS = 350000;
 const PROFILE_SYNC_ENDPOINT = "/api/profile-state";
 const PROFILE_SYNC_DEBOUNCE_MS = 700;
 const AVATAR_SIZE = 512;
-const SEARCH_RENDER_DELAY_MS = 120;
+const SEARCH_RENDER_DELAY_MS = 45;
 const MAX_SEARCH_RESULTS = 96;
 const MAX_PROFILES = 4;
 const PROFILE_THEMES = ["blue", "pink", "violet", "green"];
@@ -128,6 +128,7 @@ let inlineSeriesState = {
 const seriesDetailsCache = new Map();
 const seriesDetailsLoading = new Map();
 const searchIndexCache = new WeakMap();
+const libraryMetaCache = new WeakMap();
 let currentSeriesState = {
   open: false,
   loading: false,
@@ -1190,23 +1191,33 @@ function getItemSearchIndex(item) {
   return value;
 }
 
-function getVisibleItems(profile) {
+function getVisibleItems(profile, favoriteSet = new Set(profile.favorites)) {
   const library = getCurrentLibrary(profile);
   const query = normalizeText(searchTerm);
-  if (!query) return [];
+  if (!query) return { items: [], total: 0, hasMore: false };
   const tab = activeTab === "favorites" ? "all" : activeTab;
+  const items = [];
+  let total = 0;
+  const scanLimit = MAX_SEARCH_RESULTS + 1;
 
-  return library.filter((item) => {
-    const haystack = getItemSearchIndex(item);
-    const matchesSearch = haystack.includes(query);
-    const isFavorite = profile.favorites.includes(item.id);
+  for (const item of library) {
     const matchesTab =
       tab === "all" ||
-      (tab === "favorites" && isFavorite) ||
+      (tab === "favorites" && favoriteSet.has(item.id)) ||
       (tab === "movies" && item.type === "movie") ||
       (tab === "series" && item.type === "series");
-    return matchesSearch && matchesTab && matchesGroupFilter(item);
-  });
+    if (!matchesTab || !matchesGroupFilter(item)) continue;
+    if (!getItemSearchIndex(item).includes(query)) continue;
+    total += 1;
+    if (items.length < MAX_SEARCH_RESULTS) {
+      items.push(item);
+    }
+    if (total >= scanLimit) {
+      return { items, total, hasMore: true };
+    }
+  }
+
+  return { items, total, hasMore: false };
 }
 
 function setStatus(message, tone = "info") {
@@ -1251,10 +1262,10 @@ function fallbackPoster(theme = "blue", index = 0) {
 
 function findKnownLibraryItem(itemId, preferredProfile) {
   if (!itemId) return null;
-  const preferred = preferredProfile?.library?.find((item) => item.id === itemId);
+  const preferred = preferredProfile ? getLibraryMeta(preferredProfile).itemById.get(itemId) : null;
   if (preferred) return preferred;
   for (const profile of state.profiles) {
-    const found = profile.library?.find((item) => item.id === itemId);
+    const found = getLibraryMeta(profile).itemById.get(itemId);
     if (found) return found;
   }
   return null;
@@ -1323,12 +1334,35 @@ function getStreamingProfileMeta(profile) {
   return profile.library.length > 0 ? "Catalogo conectado" : "Conectando catalogo";
 }
 
-function buildGroupOptions(profile) {
-  const groups = Array.from(new Set(profile.library.map((item) => item.group || "Geral"))).sort();
-  return [
+function getLibraryMeta(profile) {
+  const library = profile.library || [];
+  const cached = libraryMetaCache.get(library);
+  if (cached) return cached;
+
+  let movieCount = 0;
+  let seriesCount = 0;
+  const groups = new Set();
+  const itemById = new Map();
+  for (const item of library) {
+    if (item.type === "movie") movieCount += 1;
+    if (item.type === "series") seriesCount += 1;
+    groups.add(item.group || "Geral");
+    if (item.id) itemById.set(item.id, item);
+  }
+
+  const groupOptions = [
     `<option value="all">Todas as categorias</option>`,
-    ...groups.map((group) => `<option value="${escapeHtml(group)}">${escapeHtml(group)}</option>`),
+    ...Array.from(groups)
+      .sort()
+      .map((group) => `<option value="${escapeHtml(group)}">${escapeHtml(group)}</option>`),
   ].join("");
+  const meta = { movieCount, seriesCount, groupOptions, itemById };
+  libraryMetaCache.set(library, meta);
+  return meta;
+}
+
+function buildGroupOptions(profile) {
+  return getLibraryMeta(profile).groupOptions;
 }
 
 function isAnimeItem(item) {
@@ -1367,13 +1401,44 @@ function uniqueItems(items) {
 }
 
 function pickRailItems(profile, filter, limit = 18) {
-  return uniqueItems(profile.library.filter(filter)).slice(0, limit);
+  const seen = new Set();
+  const picked = [];
+  for (const item of profile.library) {
+    if (!item || seen.has(item.id) || !filter(item)) continue;
+    seen.add(item.id);
+    picked.push(item);
+    if (picked.length >= limit) break;
+  }
+  return picked;
 }
 
-function renderRail(grid, items, profile, emptyText = "Nada encontrado ainda.") {
+function pickRecommendedItems(profile, selectedId, limit = 18) {
+  const seen = new Set();
+  const picked = [];
+  let skipped = 0;
+  for (const item of profile.library) {
+    if (!item || item.id === selectedId || seen.has(item.id)) continue;
+    seen.add(item.id);
+    if (skipped < 18) {
+      skipped += 1;
+      continue;
+    }
+    picked.push(item);
+    if (picked.length >= limit) break;
+  }
+  return picked;
+}
+
+function getFavoriteItems(profile, favoriteSet = new Set(profile.favorites)) {
+  if (!favoriteSet.size) return [];
+  const { itemById } = getLibraryMeta(profile);
+  return profile.favorites.map((favoriteId) => itemById.get(favoriteId)).filter(Boolean);
+}
+
+function renderRail(grid, items, profile, emptyText = "Nada encontrado ainda.", favoriteSet = null) {
   if (!grid) return;
   grid.innerHTML = items.length
-    ? items.map((item) => renderStreamingCard(item, profile)).join("")
+    ? items.map((item) => renderStreamingCard(item, profile, favoriteSet)).join("")
     : `<article class="empty-note">${emptyText}</article>`;
 }
 
@@ -1422,8 +1487,8 @@ function renderCard(item, profile) {
   `;
 }
 
-function renderStreamingCard(item, profile) {
-  const isFavorite = profile.favorites.includes(item.id);
+function renderStreamingCard(item, profile, favoriteSet = null) {
+  const isFavorite = favoriteSet ? favoriteSet.has(item.id) : profile.favorites.includes(item.id);
   const selected = item.id === selectedItemId;
   const primaryAction = item.kind === "series" ? "Temporadas" : "Assistir";
   const poster = item.logo || defaultAvatar(item.title);
@@ -1482,13 +1547,13 @@ function renderEmptyState(profile) {
   `;
 }
 
-function renderSearchLimitNote(total, shown) {
-  if (total <= shown) return "";
+function renderSearchLimitNote(total, shown, hasMore = false) {
+  if (!hasMore && total <= shown) return "";
   return `
     <article class="media-card wide search-limit-note">
       <div class="media-info">
         <span class="chip">Busca otimizada</span>
-        <h4>Mostrando ${shown} de ${total} resultados.</h4>
+        <h4>${hasMore ? `Mostrando os primeiros ${shown} resultados.` : `Mostrando ${shown} de ${total} resultados.`}</h4>
         <p>Digite mais letras para encontrar o título mais rápido.</p>
       </div>
     </article>
@@ -2185,7 +2250,7 @@ function scheduleSearchRender() {
     if (searchTerm.trim()) {
       activeTab = "all";
     }
-    render();
+    requestAnimationFrame(() => render({ searchOnly: true }));
   }, SEARCH_RENDER_DELAY_MS);
 }
 
@@ -2294,7 +2359,7 @@ function getHeroDescription(item) {
 
 function getActiveLibraryItem(profile) {
   if (!profile) return null;
-  return profile.library.find((item) => item.id === selectedItemId) || null;
+  return getLibraryMeta(profile).itemById.get(selectedItemId) || null;
 }
 
 function getCurrentHeroItem(profile) {
@@ -2325,46 +2390,56 @@ function updateFeaturedBanner(profile) {
   }
 }
 
-function updateHomeRails(profile) {
-  renderRail(els.recentGrid, uniqueItems(profile.library).slice(0, 18), profile, "O catalogo ainda esta carregando.");
+function updateHomeRails(profile, favoriteSet = null) {
+  renderRail(els.recentGrid, pickRailItems(profile, () => true, 18), profile, "O catalogo ainda esta carregando.", favoriteSet);
   renderRail(
     els.popularMoviesGrid,
     pickRailItems(profile, (item) => item.type === "movie" && !isAnimeItem(item), 18),
     profile,
-    "Nenhum filme encontrado ainda."
+    "Nenhum filme encontrado ainda.",
+    favoriteSet
   );
   renderRail(
     els.seriesGrid,
     pickRailItems(profile, (item) => item.type === "series" && !isAnimeItem(item), 18),
     profile,
-    "Nenhuma serie encontrada ainda."
+    "Nenhuma serie encontrada ainda.",
+    favoriteSet
   );
-  renderRail(els.animeGrid, pickRailItems(profile, isAnimeItem, 18), profile, "Nenhum anime encontrado ainda.");
+  renderRail(els.animeGrid, pickRailItems(profile, isAnimeItem, 18), profile, "Nenhum anime encontrado ainda.", favoriteSet);
   renderRail(
     els.recommendedGrid,
-    uniqueItems(profile.library.filter((item) => item.id !== selectedItemId)).slice(18, 36),
+    pickRecommendedItems(profile, selectedItemId, 18),
     profile,
-    "Carregando recomendacoes."
+    "Carregando recomendacoes.",
+    favoriteSet
   );
 }
 
-function updateSimilarRail(profile, selected) {
+function updateSimilarRail(profile, selected, favoriteSet = null) {
   if (!els.similarGrid) return;
   if (!selected) {
-    renderRail(els.similarGrid, pickRailItems(profile, (item) => item.logo, 14), profile, "Selecione um conteudo para ver semelhantes.");
+    renderRail(els.similarGrid, pickRailItems(profile, (item) => item.logo, 14), profile, "Selecione um conteudo para ver semelhantes.", favoriteSet);
     return;
   }
   const selectedGroup = normalizeText(selected.group || selected.seriesTitle || "");
   const selectedType = selected.type || selected.kind;
-  const similar = profile.library.filter((item) => {
-    if (item.id === selected.id) return false;
-    return (
+  const selectedIsAnime = isAnimeItem(selected);
+  const similar = [];
+  const seen = new Set();
+  for (const item of profile.library) {
+    if (item.id === selected.id) continue;
+    if (seen.has(item.id)) continue;
+    const matches =
       (selectedGroup && normalizeText(item.group || "").includes(selectedGroup)) ||
       item.type === selectedType ||
-      (isAnimeItem(selected) && isAnimeItem(item))
-    );
-  });
-  renderRail(els.similarGrid, uniqueItems(similar).slice(0, 14), profile, "Nenhum conteudo semelhante encontrado.");
+      (selectedIsAnime && isAnimeItem(item));
+    if (!matches) continue;
+    seen.add(item.id);
+    similar.push(item);
+    if (similar.length >= 14) break;
+  }
+  renderRail(els.similarGrid, similar, profile, "Nenhum conteudo semelhante encontrado.", favoriteSet);
 }
 
 function toggleFavorite(profile, itemId) {
@@ -2434,7 +2509,7 @@ function updatePlayer(profile, item) {
 }
 
 function selectItem(itemId, profile = getActiveProfile()) {
-  const item = profile.library.find((entry) => entry.id === itemId);
+  const item = getLibraryMeta(profile).itemById.get(itemId);
   if (!item) return;
   if (item.kind === "series") {
     selectedItemId = item.id;
@@ -2536,7 +2611,7 @@ function updateStreamingPlayer(profile, item) {
 }
 
 function selectStreamingItem(itemId, profile = getActiveProfile()) {
-  const item = profile.library.find((entry) => entry.id === itemId);
+  const item = getLibraryMeta(profile).itemById.get(itemId);
   if (!item) return;
   selectedItemId = item.id;
   rememberItem(item.id);
@@ -2567,21 +2642,23 @@ function selectStreamingItem(itemId, profile = getActiveProfile()) {
   render();
 }
 
-function render() {
+function render(options = {}) {
+  const searchOnly = options.searchOnly === true;
   const profile = getActiveProfile();
   const library = profile.library;
-  const favorites = library.filter((item) => profile.favorites.includes(item.id));
-  const continueItems = getProfileContinueItems(profile);
-  const visible = getVisibleItems(profile);
-  const visibleForRender = visible.slice(0, MAX_SEARCH_RESULTS);
-  const movieCount = library.filter((item) => item.type === "movie").length;
-  const seriesCount = library.filter((item) => item.type === "series").length;
+  const favoriteSet = new Set(profile.favorites);
+  const favorites = searchOnly ? [] : getFavoriteItems(profile, favoriteSet);
+  const continueItems = searchOnly ? [] : getProfileContinueItems(profile);
+  const visible = getVisibleItems(profile, favoriteSet);
+  const visibleForRender = visible.items;
+  const libraryMeta = getLibraryMeta(profile);
   const query = normalizeText(searchTerm);
   const hasQuery = query.length > 0;
   const titleTab = hasQuery && activeTab === "favorites" ? "all" : activeTab;
-  const selected =
-    library.find((item) => item.id === selectedItemId) ||
-    (activePlayback && activePlayback.profileId === profile.id ? activePlayback : null);
+  const selected = searchOnly
+    ? null
+    : libraryMeta.itemById.get(selectedItemId) ||
+      (activePlayback && activePlayback.profileId === profile.id ? activePlayback : null);
 
   if (els.activeAvatar) {
     els.activeAvatar.src = renderAvatar(profile);
@@ -2600,7 +2677,7 @@ function render() {
     els.profileLibraryCount.textContent = `${library.length} titulos carregados`;
   }
 
-  if (els.profileGrid) {
+  if (!searchOnly && els.profileGrid) {
     const profileCards = state.profiles
       .map(
         (item, index) => `
@@ -2647,9 +2724,9 @@ function render() {
   }
 
   if (els.statItems) els.statItems.textContent = String(library.length);
-  if (els.statMovies) els.statMovies.textContent = String(movieCount);
-  if (els.statSeries) els.statSeries.textContent = String(seriesCount);
-  if (els.resultsCount) els.resultsCount.textContent = String(visible.length);
+  if (els.statMovies) els.statMovies.textContent = String(libraryMeta.movieCount);
+  if (els.statSeries) els.statSeries.textContent = String(libraryMeta.seriesCount);
+  if (els.resultsCount) els.resultsCount.textContent = String(visible.total);
   if (els.libraryTitle) {
     els.libraryTitle.textContent =
       hasQuery
@@ -2663,7 +2740,7 @@ function render() {
         : "Pesquise para ver resultados";
   }
 
-  if (els.groupFilter) {
+  if (!searchOnly && els.groupFilter) {
     els.groupFilter.innerHTML = buildGroupOptions(profile);
     els.groupFilter.value = activeGroup;
   }
@@ -2697,34 +2774,40 @@ function render() {
     els.catalogSource.dataset.tone = profile.library.length > 0 ? "good" : "bad";
   }
 
-  updateStreamingHero(profile, selected);
-  updateStreamingPlayer(profile, selected);
-  updateFeaturedBanner(profile);
-  updateHomeRails(profile);
-  updateSimilarRail(profile, selected);
-  renderInlineSeriesDetails();
+  if (!searchOnly) {
+    updateStreamingHero(profile, selected);
+    updateStreamingPlayer(profile, selected);
+    updateFeaturedBanner(profile);
+    updateHomeRails(profile, favoriteSet);
+    updateSimilarRail(profile, selected, favoriteSet);
+    renderInlineSeriesDetails();
+  }
 
   if (els.libraryGrid) {
     els.libraryGrid.innerHTML = hasQuery
-      ? visible.length
-        ? `${visibleForRender.map((item) => renderStreamingCard(item, profile)).join("")}${renderSearchLimitNote(visible.length, visibleForRender.length)}`
+      ? visible.total
+        ? `${visibleForRender.map((item) => renderStreamingCard(item, profile, favoriteSet)).join("")}${renderSearchLimitNote(visible.total, visibleForRender.length, visible.hasMore)}`
         : renderEmptyState(profile)
       : renderEmptyState(profile);
   }
-  if (els.favoriteGrid) {
+  if (!searchOnly && els.favoriteGrid) {
     els.favoriteGrid.innerHTML = favorites.length
-      ? favorites.map((item) => renderStreamingCard(item, profile)).join("")
+      ? favorites.map((item) => renderStreamingCard(item, profile, favoriteSet)).join("")
       : `<article class="empty-note">Nenhum favorito salvo ainda.</article>`;
   }
-  els.favoritesSection?.classList.toggle("is-empty", favorites.length === 0);
-  if (els.continueGrid) els.continueGrid.innerHTML = renderHistory(profile);
-  els.continueSection?.classList.toggle("is-empty", continueItems.length === 0);
+  if (!searchOnly) {
+    els.favoritesSection?.classList.toggle("is-empty", favorites.length === 0);
+    if (els.continueGrid) els.continueGrid.innerHTML = renderHistory(profile);
+    els.continueSection?.classList.toggle("is-empty", continueItems.length === 0);
+  }
 
   document.body.classList.toggle("search-mode", hasQuery);
 
   syncTabs();
-  requestAnimationFrame(updateCarouselControls);
-  restartProfileMosaicRotation();
+  if (!searchOnly) {
+    requestAnimationFrame(updateCarouselControls);
+    restartProfileMosaicRotation();
+  }
 }
 
 function rerender() {
@@ -3055,7 +3138,7 @@ els.libraryGrid?.addEventListener("dblclick", (event) => {
   const card = event.target.closest("[data-item-id]");
   if (!card) return;
   const profile = getActiveProfile();
-  const item = profile.library.find((entry) => entry.id === card.dataset.itemId);
+  const item = getLibraryMeta(profile).itemById.get(card.dataset.itemId);
   if (item) window.open(item.url, "_blank", "noopener,noreferrer");
 });
 
