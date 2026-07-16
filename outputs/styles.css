@@ -345,6 +345,19 @@ video {
   border: 1px solid rgba(93, 198, 255, 0.16);
 }
 
+.main-playlist-status {
+  width: fit-content;
+  margin: 6px auto 0;
+}
+
+body.profile-gate .main-playlist-status {
+  display: none;
+}
+
+body:not(.profile-gate) .main-playlist-status {
+  display: inline-flex;
+}
+
 .playlist-status[data-state="loaded"] {
   color: #b8ffdb;
   border-color: rgba(49, 240, 162, 0.2);
