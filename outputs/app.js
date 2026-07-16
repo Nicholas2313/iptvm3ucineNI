@@ -767,11 +767,19 @@ function withTimeout(promise, ms, label) {
 
 async function fetchTextWithFallback(url) {
   const proxyUrl = `/api/fetch-m3u?url=${encodeURIComponent(url)}`;
-  const proxied = await withTimeout(fetch(proxyUrl, { cache: "no-store" }), 12000, "Tempo esgotado");
+  const proxied = await withTimeout(fetch(proxyUrl, { cache: "no-store" }), LIBRARY_FETCH_TIMEOUT_MS, "Tempo esgotado");
   if (!proxied.ok) {
     throw new Error(`Falha ao carregar a lista (${proxied.status})`);
   }
   return await proxied.text();
+}
+
+async function fetchDefaultM3uText() {
+  const response = await withTimeout(fetch("/api/default-m3u", { cache: "no-store" }), LIBRARY_FETCH_TIMEOUT_MS, "Tempo esgotado");
+  if (!response.ok) {
+    throw new Error(`Falha ao carregar a lista automatica (${response.status})`);
+  }
+  return await response.text();
 }
 
 function importItemsIntoProfile(profile, items) {
@@ -2840,6 +2848,7 @@ async function bootstrapLibrary() {
 
   const sources = [];
   if (savedUrl) sources.push({ kind: "m3u", url: savedUrl });
+  sources.push({ kind: "default-m3u" });
   sources.push({ kind: "default" });
 
   try {
@@ -2851,6 +2860,15 @@ async function bootstrapLibrary() {
           if (items.length) {
             importItemsIntoProfile(profile, items);
             setStatus(`${profile.library.length} itens restaurados automaticamente.`);
+            rerender();
+            return;
+          }
+        } else if (source.kind === "default-m3u") {
+          const text = await fetchDefaultM3uText();
+          const items = parseM3U(text);
+          if (items.length) {
+            importItemsIntoProfile(profile, items);
+            setStatus(`${profile.library.length} itens carregados automaticamente.`);
             rerender();
             return;
           }

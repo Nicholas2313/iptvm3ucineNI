@@ -626,9 +626,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (requestUrl.pathname === "/api/default-library") {
-      const result = await fetchMaximumDefaultLibrary();
+      const result = await fetchFirstWorkingXtreamLibrary();
       if (!result.items.length) {
-        return send(res, 502, `No M3U/Xtream source worked: ${result.errors.join("; ")}`);
+        return send(res, 502, `No Xtream source worked: ${result.errors.join("; ")}`);
       }
 
       return send(res, 200, JSON.stringify(result.items), {
