@@ -1311,16 +1311,29 @@ function renderProfileMosaic(profile, index) {
   return mosaic
     .map(
       (item, itemIndex) => `
-        <img
-          class="profile-mosaic-img"
-          src="${escapeHtml(item.logo)}"
-          alt="${escapeHtml(item.title)}"
-          width="160"
-          height="96"
-          loading="lazy"
-          data-profile-mosaic-img
-          data-fallback="${escapeHtml(fallbackPoster(profile.theme, itemIndex))}"
-        />
+        <span class="profile-mosaic-item favorite-poster" data-profile-mosaic-item>
+          <img
+            class="profile-mosaic-bg"
+            src="${escapeHtml(item.logo)}"
+            alt=""
+            width="120"
+            height="180"
+            loading="lazy"
+            aria-hidden="true"
+            data-profile-mosaic-img
+            data-fallback="${escapeHtml(fallbackPoster(profile.theme, itemIndex))}"
+          />
+          <img
+            class="profile-mosaic-img"
+            src="${escapeHtml(item.logo)}"
+            alt="${escapeHtml(item.title)}"
+            width="120"
+            height="180"
+            loading="lazy"
+            data-profile-mosaic-img
+            data-fallback="${escapeHtml(fallbackPoster(profile.theme, itemIndex))}"
+          />
+        </span>
       `
     )
     .join("");
@@ -2266,14 +2279,14 @@ function shouldPauseProfileMosaic() {
 function rotateProfileMosaics() {
   if (shouldPauseProfileMosaic()) return;
   document.querySelectorAll(".profile-card:not(.profile-create-card) .profile-mosaic").forEach((mosaic) => {
-    const images = Array.from(mosaic.querySelectorAll(".profile-mosaic-img"));
-    if (images.length < 3) return;
+    const items = Array.from(mosaic.querySelectorAll("[data-profile-mosaic-item]"));
+    if (items.length < 3) return;
     mosaic.classList.add("is-swapping");
     window.setTimeout(() => {
-      const first = images[0];
-      const second = images[1];
+      const first = items[0];
+      const second = items[1];
       if (first) mosaic.append(first);
-      if (second && images.length > 4) mosaic.append(second);
+      if (second && items.length > 4) mosaic.append(second);
       mosaic.classList.remove("is-swapping");
     }, 260);
   });
