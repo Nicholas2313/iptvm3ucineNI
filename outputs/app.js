@@ -2497,10 +2497,12 @@ function updatePlayer(profile, item) {
     els.player.load();
     els.playerEmpty.style.display = "grid";
     els.playerEmpty.textContent = item && item.kind === "series" ? "Abra a série para escolher um episódio" : "Nenhuma midia selecionada";
-    els.downloadLink.href = "#";
-    els.downloadLink.textContent = "Baixar";
-    els.downloadLink.setAttribute("aria-disabled", "true");
-    els.openLink.onclick = null;
+    if (els.downloadLink) {
+      els.downloadLink.href = "#";
+      els.downloadLink.textContent = "Baixar";
+      els.downloadLink.setAttribute("aria-disabled", "true");
+    }
+    if (els.openLink) els.openLink.onclick = null;
     return;
   }
 
@@ -2515,10 +2517,12 @@ function updatePlayer(profile, item) {
   lastPlaybackSaveAt = 0;
   els.player.src = item.url;
   els.player.load();
-  els.downloadLink.href = item.url;
-  els.downloadLink.textContent = "Baixar";
-  els.downloadLink.removeAttribute("aria-disabled");
-  els.openLink.onclick = () => window.open(item.url, "_blank", "noopener,noreferrer");
+  if (els.downloadLink) {
+    els.downloadLink.href = item.url;
+    els.downloadLink.textContent = "Baixar";
+    els.downloadLink.removeAttribute("aria-disabled");
+  }
+  if (els.openLink) els.openLink.onclick = () => window.open(item.url, "_blank", "noopener,noreferrer");
 }
 
 function selectItem(itemId, profile = getActiveProfile()) {
@@ -2550,8 +2554,8 @@ function updateStreamingHero(profile, item) {
     if (els.heroEpisodeTitle) els.heroEpisodeTitle.textContent = "Escolha um conteudo para comecar";
     els.heroDescription.textContent = "Interface limpa, moderna e otimizada para buscar o que voce quer assistir.";
     if (els.heroContinueBtn) {
-      els.heroContinueBtn.textContent = "Buscar agora";
-      els.heroContinueBtn.disabled = false;
+      els.heroContinueBtn.hidden = true;
+      els.heroContinueBtn.disabled = true;
     }
     if (els.heroFavoriteBtn) {
       els.heroFavoriteBtn.textContent = "Favoritar";
@@ -2569,6 +2573,7 @@ function updateStreamingHero(profile, item) {
   if (els.heroEpisodeTitle) els.heroEpisodeTitle.textContent = getEpisodeDisplayTitle(item);
   els.heroDescription.textContent = getHeroDescription(item);
   if (els.heroContinueBtn) {
+    els.heroContinueBtn.hidden = false;
     els.heroContinueBtn.textContent = item.kind === "series" ? "Escolher temporada" : "Continuar assistindo";
     els.heroContinueBtn.disabled = false;
   }
