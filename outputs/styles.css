@@ -288,6 +288,7 @@ video {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   white-space: nowrap;
 }
 
@@ -323,6 +324,82 @@ video {
 
 .catalog-pill span[data-tone="bad"] {
   color: var(--red);
+}
+
+.playlist-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: min(100%, 460px);
+  min-height: 34px;
+  margin: clamp(14px, 2.3vw, 24px) auto clamp(12px, 1.8vw, 20px);
+  padding: 7px 12px;
+  border-radius: 999px;
+  color: #d8f3ff;
+  font-size: clamp(0.82rem, 1.4vw, 0.95rem);
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  background: rgba(6, 30, 58, 0.38);
+  border: 1px solid rgba(93, 198, 255, 0.16);
+}
+
+.playlist-status[data-state="loaded"] {
+  color: #b8ffdb;
+  border-color: rgba(49, 240, 162, 0.2);
+  background: rgba(5, 35, 45, 0.34);
+}
+
+.playlist-status[data-state="error"] {
+  color: #ffc0c8;
+  border-color: rgba(255, 89, 106, 0.22);
+  background: rgba(52, 12, 24, 0.3);
+}
+
+.playlist-spinner {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 2px solid rgba(216, 243, 255, 0.28);
+  border-top-color: #42d7ff;
+  animation: playlist-spin 850ms linear infinite;
+}
+
+.playlist-status:not([data-state="loading"]) .playlist-spinner {
+  display: none;
+}
+
+.playlist-retry-btn {
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 176, 186, 0.3);
+  border-radius: 999px;
+  color: #ffd9df;
+  background: rgba(255, 89, 106, 0.12);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: transform 150ms ease, opacity 150ms ease, background 150ms ease;
+}
+
+.playlist-retry-btn:hover,
+.playlist-retry-btn:focus-visible {
+  transform: translateY(-1px);
+  background: rgba(255, 89, 106, 0.18);
+}
+
+.playlist-status[data-state="error"] .playlist-retry-btn {
+  flex-basis: 100%;
+  width: fit-content;
+  margin: 2px auto 0;
+}
+
+@keyframes playlist-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .catalog-pill small {

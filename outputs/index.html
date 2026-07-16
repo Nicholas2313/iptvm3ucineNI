@@ -18,10 +18,6 @@
         </div>
 
         <div class="top-actions header-actions">
-          <div class="catalog-pill header-catalog-status" aria-live="polite">
-            <span class="catalog-dot" aria-hidden="true"></span>
-            <span id="catalog-status">Lista carregada</span>
-          </div>
           <button class="install-btn primary-btn" type="button">Instalar app</button>
           <button id="quick-exit-btn" class="ghost-btn quick-exit-btn" type="button">Sair</button>
           <div class="profile-menu">
@@ -54,6 +50,11 @@
             <a class="site-logo profile-page-logo" href="#top" aria-label="M3U CINE">
               <img src="./assets/logo-m3ucine.webp" alt="M3U CINE" class="site-logo-image" />
             </a>
+            <div id="playlist-status" class="playlist-status" data-state="loading" aria-live="polite">
+              <span class="playlist-spinner" aria-hidden="true"></span>
+              <span id="catalog-status">Carregando playlist...</span>
+              <button id="playlist-retry-btn" class="playlist-retry-btn" type="button" hidden>Tentar novamente</button>
+            </div>
             <h2>Escolha um perfil</h2>
             <p>Quem vai assistir agora?</p>
           </div>
