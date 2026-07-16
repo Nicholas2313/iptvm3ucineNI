@@ -19,6 +19,10 @@
         </div>
 
         <div class="top-actions header-actions">
+          <div class="catalog-pill header-catalog-status" aria-live="polite">
+            <span class="catalog-dot" aria-hidden="true"></span>
+            <span id="catalog-status">Lista carregada</span>
+          </div>
           <button class="install-btn primary-btn" type="button">Instalar app</button>
           <div class="profile-menu">
             <button id="profile-menu-btn" class="profile-menu-btn" type="button" aria-haspopup="true" aria-expanded="false">
@@ -40,6 +44,7 @@
               <button id="exit-btn" class="menu-item danger" type="button">Sair do perfil</button>
             </div>
           </div>
+          <span id="active-profile-label" class="active-profile-label">Perfil 1</span>
           <button id="quick-exit-btn" class="ghost-btn quick-exit-btn" type="button">Sair</button>
         </div>
       </header>
@@ -102,15 +107,6 @@
             </div>
           </article>
 
-          <aside class="catalog-side-panel">
-            <div class="catalog-pill">
-              <span id="catalog-status">Conectando catálogo</span>
-              <small id="catalog-source">Carregando...</small>
-            </div>
-            <h2>Catálogo automático</h2>
-            <p>A lista padrão carrega sozinha na sua conta.</p>
-            <strong>Lista carregada.</strong>
-          </aside>
         </section>
 
         <section id="player-seasons-section" class="player-seasons-section" hidden>

@@ -22,6 +22,7 @@ const els = {
   activeAvatar: document.getElementById("active-avatar"),
   menuAvatar: document.getElementById("menu-avatar"),
   activeName: document.getElementById("active-name"),
+  activeProfileLabel: document.getElementById("active-profile-label"),
   activeMeta: document.getElementById("active-meta"),
   profileLibraryCount: document.getElementById("profile-library-count"),
   profileMenuBtn: document.getElementById("profile-menu-btn"),
@@ -2192,6 +2193,7 @@ function render() {
     els.menuAvatar.alt = `Foto de ${profile.name}`;
   }
   if (els.activeName) els.activeName.textContent = profile.name;
+  if (els.activeProfileLabel) els.activeProfileLabel.textContent = profile.name;
   if (els.activeMeta) {
     els.activeMeta.textContent = getStreamingProfileMeta(profile);
   }
@@ -2268,8 +2270,8 @@ function render() {
   }
 
   if (els.catalogStatus) {
-    els.catalogStatus.textContent = profile.library.length > 0 ? "PLAYLIST FUNCIONANDO" : "PLAYLIST COM ERRO";
-    els.catalogStatus.dataset.tone = profile.library.length > 0 ? "good" : "bad";
+    els.catalogStatus.textContent = "Lista carregada";
+    els.catalogStatus.dataset.tone = "good";
   }
   if (els.catalogSource) {
     els.catalogSource.textContent = profile.library.length > 0
@@ -2288,8 +2290,8 @@ function render() {
     els.activeMeta.textContent = getStreamingProfileMeta(profile);
   }
   if (els.catalogStatus) {
-    els.catalogStatus.textContent = profile.library.length > 0 ? "Catálogo conectado" : "Catálogo desconectado";
-    els.catalogStatus.dataset.tone = profile.library.length > 0 ? "good" : "bad";
+    els.catalogStatus.textContent = "Lista carregada";
+    els.catalogStatus.dataset.tone = "good";
   }
   if (els.catalogSource) {
     els.catalogSource.textContent = profile.library.length > 0 ? "Pronto" : "Aguardando";
