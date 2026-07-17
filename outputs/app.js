@@ -3498,10 +3498,9 @@ async function bootstrapLibrary({ force = false } = {}) {
   setStatus("Carregando catalogo automatico...");
   setPlaylistStatus("loading", "Carregando playlist...");
 
-  const sources = [];
+  const sources = [{ kind: "default" }];
   if (savedUrl) sources.push({ kind: "m3u", url: savedUrl });
   sources.push({ kind: "default-m3u" });
-  sources.push({ kind: "default" });
   let lastPlaylistError = null;
 
   try {

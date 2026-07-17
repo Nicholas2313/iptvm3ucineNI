@@ -19,7 +19,7 @@ const profileStateFile = process.env.PROFILE_STATE_FILE || path.join(root, "..",
 const profileThemes = new Set(["blue", "pink", "violet", "green"]);
 const xtreamBases = (
   process.env.XTREAM_BASE_URLS ||
-  ["http://ph1.fun", "http://topcar123.com.br", "http://phspr.pro"].join("|")
+  ["http://dnscloud.shop:80", "http://ph1.fun", "http://topcar123.com.br", "http://phspr.pro"].join("|")
 )
   .split("|")
   .map((url) => url.trim().replace(/\/$/, ""))
@@ -27,6 +27,7 @@ const xtreamBases = (
 const defaultM3uUrls = (
   process.env.DEFAULT_M3U_URLS ||
   [
+    "http://dnscloud.shop:80/get.php?username=50971241&password=91170499&type=m3u_plus&output=mpegts",
     "http://ph1.fun/get.php?username=50971241&password=91170499&type=m3u_plus&output=ts",
     "http://topcar123.com.br/get.php?username=50971241&password=91170499&type=m3u_plus&output=mpegts",
     "http://phspr.pro/get.php?username=50971241&password=91170499&type=m3u_plus&output=ts",
