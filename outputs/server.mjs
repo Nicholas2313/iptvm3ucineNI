@@ -8,13 +8,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = __dirname;
 const port = Number(process.env.PORT || 10000);
-const upstreamTimeoutMs = Number(process.env.UPSTREAM_TIMEOUT_MS || 25000);
+const upstreamTimeoutMs = Number(process.env.UPSTREAM_TIMEOUT_MS || 420000);
 const appName = process.env.APP_NAME || "M3UCINE";
 const xtreamUser = process.env.XTREAM_USER || "50971241";
 const xtreamPassword = process.env.XTREAM_PASSWORD || "91170499";
 const maxTotalLibraryItems = Number(process.env.MAX_TOTAL_LIBRARY_ITEMS || 350000);
 const maxMovieItems = Number(process.env.MAX_MOVIE_ITEMS || 350000);
 const maxSeriesItems = Number(process.env.MAX_SERIES_ITEMS || 350000);
+const xtreamSeriesInfoConcurrency = Number(process.env.XTREAM_SERIES_INFO_CONCURRENCY || 12);
+const defaultLibraryCacheTtlMs = Number(process.env.DEFAULT_LIBRARY_CACHE_TTL_MS || 6 * 60 * 60 * 1000);
 const profileStateFile = process.env.PROFILE_STATE_FILE || path.join(root, "..", ".m3ucine-profile-state.json");
 const profileThemes = new Set(["blue", "pink", "violet", "green"]);
 const xtreamBases = (
@@ -36,6 +38,9 @@ const defaultM3uUrls = (
   .split("|")
   .map((url) => url.trim())
   .filter(Boolean);
+
+let defaultLibraryCache = null;
+let defaultLibraryCachePromise = null;
 
 const types = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -318,7 +323,9 @@ function parseAttributes(text) {
 
 function detectM3uType(title, group) {
   const haystack = normalizeText(`${title} ${group}`);
-  if (/(canal|canais|live|ao vivo|channel|iptv|tv ao vivo|broadcast)/i.test(haystack)) return null;
+  const hasMediaHint = /(filme|filmes|movie|movies|vod|cinema|serie|series|seriado|temporada|season|episode|episodio|episodios|show|capitulo|anime|animes|dorama|novela)/i.test(haystack);
+  const hasChannelHint = /\b(canal|canais|live|ao vivo|channel|iptv|tv|broadcast|24h|24 horas|jornal|noticias|esporte ao vivo|futebol ao vivo|ppv|premiere)\b/i.test(haystack);
+  if (hasChannelHint && !hasMediaHint) return null;
   if (/(serie|series|season|episode|episodio|episodios|show|capitulo)/i.test(haystack)) return "series";
   if (/(filme|filmes|movie|movies|vod|cinema)/i.test(haystack)) return "movie";
   return "movie";
@@ -613,6 +620,41 @@ async function fetchXtreamSeriesInfoFromBase(base, seriesId) {
   return normalizeSeriesInfo(base, seriesId, payload);
 }
 
+async function fetchXtreamEpisodeItems(base, seriesItems, budget) {
+  const episodes = [];
+  const errors = [];
+  let cursor = 0;
+  const concurrency = Math.max(1, Math.min(32, xtreamSeriesInfoConcurrency));
+
+  async function worker() {
+    while (cursor < seriesItems.length && episodes.length < budget) {
+      const seriesItem = seriesItems[cursor];
+      cursor += 1;
+      if (!seriesItem?.seriesId) continue;
+
+      try {
+        const details = await fetchXtreamSeriesInfoFromBase(base, seriesItem.seriesId);
+        for (const season of details.seasons || []) {
+          for (const episode of season.episodes || []) {
+            episodes.push({
+              ...episode,
+              group: seriesItem.title,
+              seriesTitle: seriesItem.title,
+              searchText: `${seriesItem.title} ${episode.title || ""} ${episode.fullTitle || ""}`,
+            });
+            if (episodes.length >= budget) return;
+          }
+        }
+      } catch (error) {
+        errors.push(`${seriesItem.title || seriesItem.seriesId} -> ${error.message || "falhou"}`);
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  return { episodes, errors };
+}
+
 async function fetchFirstWorkingXtreamLibrary() {
   const errors = [];
   const mergedItems = [];
@@ -635,6 +677,65 @@ async function fetchFirstWorkingXtreamLibrary() {
 
   const items = uniqueById(mergedItems).slice(0, maxTotalLibraryItems);
   return { items, base: workingBases.join("|") || null, errors };
+}
+
+async function fetchExpandedXtreamLibraryFromBase(base) {
+  const basicItems = await fetchXtreamLibraryFromBase(base);
+  const movies = basicItems.filter((item) => item.type === "movie").slice(0, maxMovieItems);
+  const series = basicItems.filter((item) => item.kind === "series" && item.type === "series").slice(0, maxSeriesItems);
+  const budget = Math.max(0, maxTotalLibraryItems - movies.length - series.length);
+  const { episodes, errors } = budget > 0
+    ? await fetchXtreamEpisodeItems(base, series, budget)
+    : { episodes: [], errors: [] };
+
+  return {
+    items: uniqueById([...movies, ...series, ...episodes]).slice(0, maxTotalLibraryItems),
+    errors,
+  };
+}
+
+async function fetchFirstWorkingExpandedXtreamLibrary() {
+  const errors = [];
+
+  for (const base of xtreamBases) {
+    try {
+      const result = await fetchExpandedXtreamLibraryFromBase(base);
+      if (result.items.length) {
+        return { items: result.items, base, errors: result.errors || [] };
+      }
+      errors.push(`${base} -> sem itens`);
+    } catch (error) {
+      errors.push(`${base} -> ${error.message || "falhou"}`);
+    }
+  }
+
+  return { items: [], base: null, errors };
+}
+
+async function getCachedDefaultLibrary() {
+  if (
+    defaultLibraryCache &&
+    Date.now() - defaultLibraryCache.updatedAt < defaultLibraryCacheTtlMs &&
+    Array.isArray(defaultLibraryCache.result?.items) &&
+    defaultLibraryCache.result.items.length
+  ) {
+    return defaultLibraryCache.result;
+  }
+
+  if (!defaultLibraryCachePromise) {
+    defaultLibraryCachePromise = fetchFirstWorkingExpandedXtreamLibrary()
+      .then((result) => {
+        if (result.items?.length) {
+          defaultLibraryCache = { updatedAt: Date.now(), result };
+        }
+        return result;
+      })
+      .finally(() => {
+        defaultLibraryCachePromise = null;
+      });
+  }
+
+  return defaultLibraryCachePromise;
 }
 
 async function fetchFirstWorkingM3uLibrary() {

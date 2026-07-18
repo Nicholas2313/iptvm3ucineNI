@@ -57,7 +57,7 @@ function looksLikeSeriesContext(title, group, item = {}) {
 function detectType(title, group) {
   const haystack = compactText(`${title} ${group}`);
   const hasMediaHint = /\b(filme|filmes|movie|movies|vod|cinema|serie|series|seriado|temporada|season|episode|episodio|episodios|show|capitulo|anime|animes|desenho|desenhos|dorama|novela)\b/i.test(haystack);
-  const hasChannelHint = /\b(canal|canais|live|ao vivo|channel|iptv|tv ao vivo|broadcast|24h|24 horas|noticias|jornal|esporte ao vivo|futebol ao vivo|ppv|premiere|globo|record|sbt|band|rede tv|cnn|fox sports|espn|sportv)\b/i.test(haystack);
+  const hasChannelHint = /\b(canal|canais|live|ao vivo|channel|iptv|tv|broadcast|24h|24 horas|noticias|jornal|esporte ao vivo|futebol ao vivo|ppv|premiere|globo|record|sbt|band|rede tv|cnn|fox sports|espn|sportv)\b/i.test(haystack);
   if (hasChannelHint && !hasMediaHint) return null;
   if (/(serie|series|season|episode|episodio|episodios|show|capitulo)/i.test(haystack)) return "series";
   if (/(filme|filmes|movie|movies|vod|cinema)/i.test(haystack)) return "movie";

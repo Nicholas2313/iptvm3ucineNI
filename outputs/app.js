@@ -10,9 +10,10 @@ const LAST_M3U_URL_KEY = "m3ucine-last-m3u-url";
 const LEGACY_LAST_M3U_URL_KEY = "calicine-iptv-last-m3u-url";
 const MIN_CONTINUE_SECONDS = 8;
 const PLAYBACK_SAVE_INTERVAL_MS = 1000;
-const LIBRARY_FETCH_TIMEOUT_MS = 90000;
+const LIBRARY_FETCH_TIMEOUT_MS = 420000;
 const MAX_LIBRARY_ITEMS = 350000;
 const MAX_CACHED_LIBRARY_ITEMS = 25000;
+const MIN_COMPLETE_LIBRARY_ITEMS = 50000;
 const PROFILE_SYNC_ENDPOINT = "/api/profile-state";
 const PROFILE_SYNC_DEBOUNCE_MS = 700;
 const AVATAR_SIZE = 512;
@@ -1133,7 +1134,7 @@ function parseAttributes(text) {
 function detectType(title, group) {
   const haystack = normalizeText(`${title} ${group}`);
   const hasMediaHint = /(^|\b)(filme|filmes|movie|movies|vod|cinema|serie|series|seriado|temporada|season|episode|episodio|episodios|show|capitulo|anime|animes|desenho|desenhos|dorama|novela)(\b|$)/i.test(haystack);
-  const hasChannelHint = /(^|\b)(canal|canais|live|ao vivo|channel|iptv|tv ao vivo|broadcast|24h|24 horas|noticias|jornal|esporte ao vivo|futebol ao vivo|ppv|premiere|globo|record|sbt|band|rede tv|cnn|fox sports|espn|sportv)(\b|$)/i.test(haystack);
+  const hasChannelHint = /(^|\b)(canal|canais|live|ao vivo|channel|iptv|tv|broadcast|24h|24 horas|noticias|jornal|esporte ao vivo|futebol ao vivo|ppv|premiere|globo|record|sbt|band|rede tv|cnn|fox sports|espn|sportv)(\b|$)/i.test(haystack);
   if (hasChannelHint && !hasMediaHint) return null;
   if (/(serie|series|season|episode|episodio|episodios|show|capitulo)/i.test(haystack)) return "series";
   if (/(filme|filmes|movie|movies|vod|cinema)/i.test(haystack)) return "movie";
@@ -3486,7 +3487,7 @@ async function bootstrapLibrary({ force = false } = {}) {
     pendingCatalogBootstrap = pendingCatalogBootstrap || force || profile.library.length === 0;
     return;
   }
-  if (!force && profile.library.length > 0) {
+  if (!force && profile.library.length >= MIN_COMPLETE_LIBRARY_ITEMS) {
     setPlaylistStatus("loaded", "Playlist carregada");
     return;
   }
@@ -3495,12 +3496,12 @@ async function bootstrapLibrary({ force = false } = {}) {
   }
 
   profileCatalogLoading = true;
-  setStatus("Carregando catalogo automatico...");
-  setPlaylistStatus("loading", "Carregando playlist...");
+  setStatus(profile.library.length > 0 ? "Atualizando catalogo completo..." : "Carregando catalogo automatico...");
+  setPlaylistStatus("loading", profile.library.length > 0 ? "Atualizando playlist..." : "Carregando playlist...");
 
-  const sources = [{ kind: "default" }];
+  const sources = [{ kind: "default-m3u" }];
   if (savedUrl) sources.push({ kind: "m3u", url: savedUrl });
-  sources.push({ kind: "default-m3u" });
+  sources.push({ kind: "default" });
   let lastPlaylistError = null;
 
   try {
