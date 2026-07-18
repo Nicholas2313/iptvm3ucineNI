@@ -15,11 +15,15 @@
           <a class="site-logo" href="#top" aria-label="M3U CINE">
             <img src="./assets/logo-m3ucine.webp" alt="M3U CINE" class="site-logo-image" />
           </a>
+          <nav class="header-nav" aria-label="Navegação do catálogo">
+            <button class="header-nav-link active" data-tab="all" type="button">Início</button>
+            <button class="header-nav-link" data-tab="movies" type="button">Filmes</button>
+            <button class="header-nav-link" data-tab="series" type="button">Séries</button>
+          </nav>
         </div>
 
         <div class="top-actions header-actions">
-          <button class="install-btn primary-btn" type="button">Instalar app</button>
-          <button id="quick-exit-btn" class="ghost-btn quick-exit-btn" type="button">Sair</button>
+          <button class="header-search-btn" type="button" data-focus-search aria-label="Pesquisar">⌕</button>
           <div class="profile-menu">
             <button id="profile-menu-btn" class="profile-menu-btn" type="button" aria-haspopup="true" aria-expanded="false">
               <img id="active-avatar" class="profile-avatar" alt="Foto de perfil ativa" width="48" height="48" />
@@ -36,7 +40,10 @@
                 <span>Biblioteca</span>
                 <strong id="profile-library-count">0 títulos</strong>
               </div>
-              <button id="edit-profile-menu-btn" class="menu-item" type="button">Editar perfil</button>
+              <button id="edit-profile-menu-btn" class="menu-item" type="button">Meu perfil</button>
+              <button class="menu-item" type="button" data-focus-search>Solicitar filme ou série</button>
+              <button class="menu-item" type="button" data-reload-library>Recarregar lista</button>
+              <button class="install-btn menu-item" type="button">Instalar app</button>
               <button id="exit-btn" class="menu-item danger" type="button">Sair do perfil</button>
             </div>
           </div>
@@ -50,8 +57,7 @@
             <a class="site-logo profile-page-logo" href="#top" aria-label="M3U CINE">
               <img src="./assets/logo-m3ucine.webp" alt="M3U CINE" class="site-logo-image" />
             </a>
-            <h2>Escolha um perfil</h2>
-            <p>Quem vai assistir agora?</p>
+            <h2>Quem vai assistir?</h2>
           </div>
 
           <div id="profile-grid" class="profile-grid"></div>
@@ -63,7 +69,7 @@
 
         <div id="playlist-status" class="playlist-status main-playlist-status" data-state="loading" aria-live="polite">
           <span class="playlist-spinner" aria-hidden="true"></span>
-          <span id="catalog-status">Carregando playlist...</span>
+          <span id="catalog-status">Carregando catálogo...</span>
         </div>
 
         <section class="featured-banner" id="featured-banner">
@@ -124,13 +130,12 @@
 
         <section class="filter-strip search-results-controls">
           <nav class="main-nav" id="tabs" aria-label="Navegação principal">
-            <button class="tab active" data-tab="all" type="button">Início</button>
             <button class="tab" data-tab="movies" type="button">Filmes</button>
             <button class="tab" data-tab="series" type="button">Séries</button>
           </nav>
           <label class="global-search header-search">
             <span>Buscar</span>
-            <input id="search-input" type="search" placeholder="Pesquisar título, categoria ou episódio" />
+            <input id="search-input" type="search" placeholder="Pesquisar filme, série, ator, categoria ou episódio..." />
           </label>
           <label class="select-box">
             <span>Filtro de categoria</span>

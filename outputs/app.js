@@ -642,9 +642,9 @@ function setActiveProfile(id) {
   render();
   const profile = getActiveProfile();
   if (profile.library.length >= MIN_COMPLETE_LIBRARY_ITEMS) {
-    setPlaylistStatus("loaded", "Playlist carregada");
+    setPlaylistStatus("loaded", "Catálogo carregado");
   } else {
-    setPlaylistStatus("loading", profile.library.length > 0 ? "Atualizando playlist..." : "Carregando playlist...");
+    setPlaylistStatus("loading", profile.library.length > 0 ? "Tentando reconectar..." : "Carregando catálogo...");
     bootstrapLibrary();
   }
 }
@@ -1223,12 +1223,12 @@ async function fetchDefaultM3uText() {
 function getPlaylistErrorMessage(error) {
   const message = String(error?.message || error || "");
   if (/credenciais|invalid_credentials|username or password/i.test(message)) {
-    return "Credenciais da playlist inválidas";
+    return "Credenciais do catálogo inválidas";
   }
   if (/tempo esgotado|timeout/i.test(message)) {
-    return "Tempo esgotado ao carregar a playlist";
+    return "Tempo esgotado ao carregar catálogo";
   }
-  return "Erro ao carregar a playlist";
+  return "Erro ao carregar catálogo";
 }
 
 function loadM3uCatalogInWorker({ url = "", defaultM3u = false } = {}) {
@@ -1249,7 +1249,7 @@ function loadM3uCatalogInWorker({ url = "", defaultM3u = false } = {}) {
       const data = event.data || {};
       if (data.type === "progress" && data.message) {
         setStatus(data.message);
-        setPlaylistStatus("loading", "Carregando playlist...");
+        setPlaylistStatus("loading", "Carregando catálogo...");
         return;
       }
       cleanup();
@@ -1366,10 +1366,10 @@ function setPlaylistStatus(state, message) {
   playlistState = state;
   const fallbackMessage =
     state === "loaded"
-      ? "Playlist carregada"
+      ? "Catálogo carregado"
       : state === "error"
-        ? "Erro ao carregar a playlist"
-        : "Carregando playlist...";
+        ? "Erro ao carregar catálogo"
+        : "Carregando catálogo...";
   if (els.playlistStatus) {
     els.playlistStatus.dataset.state = state;
   }
@@ -2355,7 +2355,7 @@ function openSeriesEpisode(profile, episode, seriesItem, options = {}) {
 }
 
 function syncTabs() {
-  document.querySelectorAll(".tab").forEach((button) => {
+  document.querySelectorAll(".tab, .header-nav-link").forEach((button) => {
     button.classList.toggle("active", button.dataset.tab === activeTab);
   });
 }
@@ -2870,24 +2870,18 @@ function render(options = {}) {
             </span>
             <span class="profile-card-copy">
               <strong>${escapeHtml(item.name)}</strong>
-              <small>Seus favoritos</small>
             </span>
-            <span class="profile-mosaic" aria-hidden="true">
-              ${renderProfileMosaic(item, index)}
-            </span>
-            <span class="profile-card-footer">${profileManageMode ? "Editar perfil" : profileCardLabel(index, item, profile.id)}</span>
           </button>
         `
       )
       .join("");
     const createCard =
-      profileManageMode && state.profiles.length < MAX_PROFILES
+      state.profiles.length < MAX_PROFILES
         ? `
           <button class="profile-card profile-create-card" data-create-profile type="button" aria-label="Criar novo perfil">
             <span class="profile-create-icon">+</span>
             <span class="profile-card-copy">
               <strong>Novo perfil</strong>
-              <small>Criar universo</small>
             </span>
           </button>
         `
@@ -2923,8 +2917,8 @@ function render(options = {}) {
 
   if (els.catalogSource) {
     els.catalogSource.textContent = profile.library.length > 0
-      ? "A playlist está funcionando."
-      : "A playlist não foi carregada.";
+      ? "O catálogo está funcionando."
+      : "O catálogo não foi carregado.";
     els.catalogSource.dataset.tone = profile.library.length > 0 ? "good" : "bad";
   }
   if (els.activeAvatar) {
@@ -3093,6 +3087,25 @@ els.tabs?.addEventListener("click", (event) => {
 });
 
 document.addEventListener("click", (event) => {
+  const button = event.target.closest(".header-nav-link[data-tab]");
+  if (!button) return;
+  if (button.dataset.tab === "all") {
+    resetHomeView();
+    return;
+  }
+  activeTab = button.dataset.tab;
+  render();
+});
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-reload-library]");
+  if (!button) return;
+  if (els.profileMenuPanel) els.profileMenuPanel.hidden = true;
+  els.profileMenuBtn?.setAttribute("aria-expanded", "false");
+  bootstrapLibrary({ force: true });
+});
+
+document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-carousel-target]");
   if (!button) return;
   scrollCarousel(button.dataset.carouselTarget, Number(button.dataset.carouselDir || 1));
@@ -3247,27 +3260,27 @@ els.importForm?.addEventListener("submit", async (event) => {
     els.importButton.disabled = true;
     els.importButton.textContent = "Carregando...";
   }
-  setStatus("Carregando playlist automatica...");
-  setPlaylistStatus("loading", "Carregando playlist...");
+  setStatus("Carregando catálogo automático...");
+  setPlaylistStatus("loading", "Carregando catálogo...");
 
   try {
     if (!url) {
       setStatus("Playlist automatica indisponivel.", "error");
-      setPlaylistStatus("error", "Erro ao carregar a playlist");
+      setPlaylistStatus("error", "Erro ao carregar catálogo");
       return;
     }
 
     const { items, audit, preorganized } = await fetchM3uCatalog({ url });
     if (!items.length) {
       setStatus("Nao encontrei filmes ou series validos nessa lista.", "error");
-      setPlaylistStatus("error", "Erro ao carregar a playlist");
+      setPlaylistStatus("error", "Erro ao carregar catálogo");
       return;
     }
 
     importItemsIntoProfile(profile, items, { preorganized, audit });
     localStorage.setItem(LAST_M3U_URL_KEY, url);
     setStatus(`${profile.library.length} itens carregados com sucesso.`);
-    setPlaylistStatus("loaded", "Playlist carregada");
+    setPlaylistStatus("loaded", "Catálogo carregado");
     rerender();
   } catch (error) {
     setPlaylistStatus("error", getPlaylistErrorMessage(error));
@@ -3492,7 +3505,7 @@ async function bootstrapLibrary({ force = false } = {}) {
     return;
   }
   if (!force && profile.library.length >= MIN_COMPLETE_LIBRARY_ITEMS) {
-    setPlaylistStatus("loaded", "Playlist carregada");
+    setPlaylistStatus("loaded", "Catálogo carregado");
     return;
   }
   if (force) {
@@ -3501,7 +3514,7 @@ async function bootstrapLibrary({ force = false } = {}) {
 
   profileCatalogLoading = true;
   setStatus(profile.library.length > 0 ? "Atualizando catalogo completo..." : "Carregando catalogo automatico...");
-  setPlaylistStatus("loading", profile.library.length > 0 ? "Atualizando playlist..." : "Carregando playlist...");
+  setPlaylistStatus("loading", profile.library.length > 0 ? "Tentando reconectar..." : "Carregando catálogo...");
   render();
 
   const sources = [{ kind: "default-m3u" }];
@@ -3520,7 +3533,7 @@ async function bootstrapLibrary({ force = false } = {}) {
           if (items.length) {
             importItemsIntoProfile(profile, items, { preorganized, audit });
             setStatus(`${profile.library.length} itens ${source.kind === "m3u" ? "restaurados" : "carregados"} automaticamente.`);
-            setPlaylistStatus("loaded", "Playlist carregada");
+            setPlaylistStatus("loaded", "Catálogo carregado");
             rerender();
             return;
           }
@@ -3531,7 +3544,7 @@ async function bootstrapLibrary({ force = false } = {}) {
             if (Array.isArray(items) && items.length) {
               importItemsIntoProfile(profile, items);
               setStatus(`${profile.library.length} itens carregados automaticamente.`);
-              setPlaylistStatus("loaded", "Playlist carregada");
+              setPlaylistStatus("loaded", "Catálogo carregado");
               rerender();
               return;
             }
