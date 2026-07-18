@@ -640,10 +640,11 @@ function setActiveProfile(id) {
   document.body.classList.remove("profile-gate");
   saveState();
   render();
-  if (getActiveProfile().library.length > 0) {
+  const profile = getActiveProfile();
+  if (profile.library.length >= MIN_COMPLETE_LIBRARY_ITEMS) {
     setPlaylistStatus("loaded", "Playlist carregada");
   } else {
-    setPlaylistStatus("loading", "Carregando playlist...");
+    setPlaylistStatus("loading", profile.library.length > 0 ? "Atualizando playlist..." : "Carregando playlist...");
     bootstrapLibrary();
   }
 }
@@ -2846,7 +2847,10 @@ function render(options = {}) {
     els.activeMeta.textContent = getStreamingProfileMeta(profile);
   }
   if (els.profileLibraryCount) {
-    els.profileLibraryCount.textContent = `${library.length} titulos carregados`;
+    els.profileLibraryCount.textContent =
+      library.length > 0 && library.length < MIN_COMPLETE_LIBRARY_ITEMS && profileCatalogLoading
+        ? `${library.length} titulos, atualizando...`
+        : `${library.length} titulos carregados`;
   }
 
   if (!searchOnly && els.profileGrid) {
@@ -3498,6 +3502,7 @@ async function bootstrapLibrary({ force = false } = {}) {
   profileCatalogLoading = true;
   setStatus(profile.library.length > 0 ? "Atualizando catalogo completo..." : "Carregando catalogo automatico...");
   setPlaylistStatus("loading", profile.library.length > 0 ? "Atualizando playlist..." : "Carregando playlist...");
+  render();
 
   const sources = [{ kind: "default-m3u" }];
   if (savedUrl) sources.push({ kind: "m3u", url: savedUrl });
