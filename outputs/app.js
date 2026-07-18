@@ -61,6 +61,13 @@ const els = {
   importStatus: document.getElementById("import-status"),
   importButton: document.querySelector("#import-form button[type='submit']"),
   tabs: document.getElementById("tabs"),
+  categoryToggle: document.getElementById("category-toggle"),
+  categoryPanel: document.getElementById("category-panel"),
+  categoryClose: document.getElementById("category-close"),
+  categorySearch: document.getElementById("category-search"),
+  movieCategoryList: document.getElementById("movie-category-list"),
+  seriesCategoryList: document.getElementById("series-category-list"),
+  clearFilters: document.getElementById("clear-filters"),
   exitBtn: document.getElementById("exit-btn"),
   quickExitBtn: document.getElementById("quick-exit-btn"),
   searchInput: document.getElementById("search-input"),
@@ -103,10 +110,35 @@ const els = {
   clearHistory: document.getElementById("clear-history"),
 };
 
+const contentRoot = document.getElementById("top");
+const profileSection = document.getElementById("profiles");
+const catalogNodes = contentRoot && profileSection
+  ? Array.from(contentRoot.children).filter((node) => node !== profileSection)
+  : [];
+const catalogAnchor = document.createComment("m3ucine-catalog-anchor");
+if (contentRoot && catalogNodes.length) {
+  contentRoot.insertBefore(catalogAnchor, catalogNodes[0]);
+}
+
+function syncCatalogDom() {
+  if (!contentRoot || !catalogNodes.length) return;
+  const shouldShowCatalog = !document.body.classList.contains("profile-gate");
+  const isMounted = catalogNodes.some((node) => node.parentNode === contentRoot);
+  if (shouldShowCatalog && !isMounted) {
+    catalogNodes.forEach((node) => contentRoot.insertBefore(node, catalogAnchor));
+    return;
+  }
+  if (!shouldShowCatalog && isMounted) {
+    catalogNodes.forEach((node) => node.parentNode?.removeChild(node));
+  }
+}
+
 const state = loadState();
 let activeTab = "all";
 let activeGroup = "all";
 let searchTerm = "";
+let categorySearchTerm = "";
+let categoryPanelOpen = false;
 let selectedItemId = null;
 let importTimer = null;
 const recentHistory = loadHistory();
@@ -315,6 +347,7 @@ function openProfileGate() {
   profileGateOpen = false;
   profileManageMode = false;
   document.body.classList.add("profile-gate");
+  syncCatalogDom();
   closeProfileEditor();
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -638,6 +671,7 @@ function setActiveProfile(id) {
   playbackRestoreTime = 0;
   profileGateOpen = true;
   document.body.classList.remove("profile-gate");
+  syncCatalogDom();
   saveState();
   render();
   const profile = getActiveProfile();
@@ -1330,8 +1364,9 @@ function getMediaPlaybackUrl(item) {
 function getVisibleItems(profile, favoriteSet = new Set(profile.favorites)) {
   const library = getCurrentLibrary(profile);
   const query = normalizeText(searchTerm);
-  if (!query) return { items: [], total: 0, hasMore: false };
   const tab = activeTab === "favorites" ? "all" : activeTab;
+  const hasTypeOrGroupFilter = tab !== "all" || activeGroup !== "all";
+  if (!query && !hasTypeOrGroupFilter) return { items: [], total: 0, hasMore: false };
   const items = [];
   let total = 0;
   const scanLimit = MAX_SEARCH_RESULTS + 1;
@@ -1343,7 +1378,7 @@ function getVisibleItems(profile, favoriteSet = new Set(profile.favorites)) {
       (tab === "movies" && item.type === "movie") ||
       (tab === "series" && item.type === "series");
     if (!matchesTab || !matchesGroupFilter(item)) continue;
-    if (!getItemSearchIndex(item).includes(query)) continue;
+    if (query && !getItemSearchIndex(item).includes(query)) continue;
     total += 1;
     if (items.length < MAX_SEARCH_RESULTS) {
       items.push(item);
@@ -1508,11 +1543,20 @@ function getLibraryMeta(profile) {
   let movieCount = 0;
   let seriesCount = 0;
   const groups = new Set();
+  const movieGroups = new Set();
+  const seriesGroups = new Set();
   const itemById = new Map();
   for (const item of library) {
-    if (item.type === "movie") movieCount += 1;
-    if (item.type === "series") seriesCount += 1;
-    groups.add(item.group || "Geral");
+    const group = item.group || "Geral";
+    if (item.type === "movie") {
+      movieCount += 1;
+      movieGroups.add(group);
+    }
+    if (item.type === "series") {
+      seriesCount += 1;
+      seriesGroups.add(group);
+    }
+    groups.add(group);
     if (item.id) itemById.set(item.id, item);
   }
 
@@ -1522,13 +1566,45 @@ function getLibraryMeta(profile) {
       .sort()
       .map((group) => `<option value="${escapeHtml(group)}">${escapeHtml(group)}</option>`),
   ].join("");
-  const meta = { movieCount, seriesCount, groupOptions, itemById };
+  const meta = { movieCount, seriesCount, groupOptions, itemById, movieGroups: Array.from(movieGroups).sort(), seriesGroups: Array.from(seriesGroups).sort() };
   libraryMetaCache.set(library, meta);
   return meta;
 }
 
 function buildGroupOptions(profile) {
   return getLibraryMeta(profile).groupOptions;
+}
+
+function categoryButtonHtml(group, type) {
+  const active = activeGroup === group && activeTab === type;
+  return `
+    <button class="category-option ${active ? "active" : ""}" type="button" data-category-type="${type}" data-category-name="${escapeHtml(group)}">
+      ${escapeHtml(group)}
+    </button>
+  `;
+}
+
+function renderCategoryList(groups, type) {
+  const query = normalizeText(categorySearchTerm);
+  const filtered = groups.filter((group) => !query || normalizeText(group).includes(query));
+  if (!filtered.length) return `<p class="empty-note category-empty">Nenhuma categoria encontrada.</p>`;
+  return filtered.map((group) => categoryButtonHtml(group, type)).join("");
+}
+
+function renderCategoryPanel(profile) {
+  if (!els.movieCategoryList && !els.seriesCategoryList) return;
+  const meta = getLibraryMeta(profile);
+  if (els.movieCategoryList) {
+    els.movieCategoryList.innerHTML = renderCategoryList(meta.movieGroups, "movies");
+  }
+  if (els.seriesCategoryList) {
+    els.seriesCategoryList.innerHTML = renderCategoryList(meta.seriesGroups, "series");
+  }
+  if (els.categoryPanel) els.categoryPanel.hidden = !categoryPanelOpen;
+  if (els.categoryToggle) {
+    els.categoryToggle.classList.toggle("active", categoryPanelOpen || activeGroup !== "all");
+    els.categoryToggle.setAttribute("aria-expanded", String(categoryPanelOpen));
+  }
 }
 
 function isAnimeItem(item) {
@@ -2356,6 +2432,7 @@ function openSeriesEpisode(profile, episode, seriesItem, options = {}) {
 
 function syncTabs() {
   document.querySelectorAll(".tab, .header-nav-link").forEach((button) => {
+    if (!button.dataset.tab) return;
     button.classList.toggle("active", button.dataset.tab === activeTab);
   });
 }
@@ -2365,9 +2442,12 @@ function resetHomeView() {
   activeTab = "all";
   activeGroup = "all";
   searchTerm = "";
+  categorySearchTerm = "";
+  categoryPanelOpen = false;
   selectedItemId = null;
   inlineSeriesState = { loading: false, seriesItem: null, details: null, activeSeason: null, selectedEpisodeId: null };
   if (els.searchInput) els.searchInput.value = "";
+  if (els.categorySearch) els.categorySearch.value = "";
   if (els.groupFilter) els.groupFilter.value = "all";
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2376,8 +2456,12 @@ function resetHomeView() {
 function exitToProfileGate() {
   window.clearTimeout(searchRenderTimer);
   activeTab = "all";
+  activeGroup = "all";
   searchTerm = "";
+  categorySearchTerm = "";
+  categoryPanelOpen = false;
   if (els.searchInput) els.searchInput.value = "";
+  if (els.categorySearch) els.categorySearch.value = "";
   openProfileGate();
 }
 
@@ -2827,6 +2911,8 @@ function render(options = {}) {
   const libraryMeta = getLibraryMeta(profile);
   const query = normalizeText(searchTerm);
   const hasQuery = query.length > 0;
+  const hasFilter = activeTab !== "all" || activeGroup !== "all";
+  const hasResultView = hasQuery || hasFilter;
   const titleTab = hasQuery && activeTab === "favorites" ? "all" : activeTab;
   const selected = searchOnly
     ? null
@@ -2899,20 +2985,26 @@ function render(options = {}) {
   if (els.resultsCount) els.resultsCount.textContent = String(visible.total);
   if (els.libraryTitle) {
     els.libraryTitle.textContent =
-      hasQuery
-        ? titleTab === "all"
-          ? "Resultados da busca"
-          : titleTab === "movies"
-            ? "Filmes encontrados"
-            : titleTab === "series"
-              ? "Series encontradas"
-              : "Favoritos encontrados"
+      activeGroup !== "all"
+        ? activeGroup
+        : hasResultView
+          ? titleTab === "all"
+            ? "Resultados da busca"
+            : titleTab === "movies"
+              ? "Filmes"
+              : titleTab === "series"
+                ? "Séries"
+                : "Favoritos"
         : "Pesquise para ver resultados";
   }
 
   if (!searchOnly && els.groupFilter) {
     els.groupFilter.innerHTML = buildGroupOptions(profile);
     els.groupFilter.value = activeGroup;
+  }
+  renderCategoryPanel(profile);
+  if (els.clearFilters) {
+    els.clearFilters.hidden = !hasResultView;
   }
 
   if (els.catalogSource) {
@@ -2947,7 +3039,7 @@ function render(options = {}) {
   }
 
   if (els.libraryGrid) {
-    els.libraryGrid.innerHTML = hasQuery
+    els.libraryGrid.innerHTML = hasResultView
       ? visible.total
         ? `${visibleForRender.map((item) => renderStreamingCard(item, profile, favoriteSet)).join("")}${renderSearchLimitNote(visible.total, visibleForRender.length, visible.hasMore)}`
         : renderEmptyState(profile)
@@ -2964,13 +3056,15 @@ function render(options = {}) {
     els.continueSection?.classList.toggle("is-empty", continueItems.length === 0);
   }
 
-  document.body.classList.toggle("search-mode", hasQuery);
+  document.body.classList.toggle("search-mode", hasResultView);
+  document.body.classList.toggle("clean-home-mode", !hasResultView);
 
   syncTabs();
   if (!searchOnly) {
     requestAnimationFrame(updateCarouselControls);
     restartProfileMosaicRotation();
   }
+  syncCatalogDom();
 }
 
 function rerender() {
@@ -3082,6 +3176,7 @@ els.tabs?.addEventListener("click", (event) => {
     resetHomeView();
     return;
   }
+  categoryPanelOpen = false;
   activeTab = button.dataset.tab;
   render();
 });
@@ -3093,8 +3188,38 @@ document.addEventListener("click", (event) => {
     resetHomeView();
     return;
   }
+  categoryPanelOpen = false;
   activeTab = button.dataset.tab;
   render();
+});
+
+els.categoryToggle?.addEventListener("click", () => {
+  categoryPanelOpen = !categoryPanelOpen;
+  render();
+});
+
+els.categoryClose?.addEventListener("click", () => {
+  categoryPanelOpen = false;
+  render();
+});
+
+els.categorySearch?.addEventListener("input", () => {
+  categorySearchTerm = els.categorySearch.value || "";
+  renderCategoryPanel(getActiveProfile());
+});
+
+els.categoryPanel?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-category-name]");
+  if (!button) return;
+  activeTab = button.dataset.categoryType || "all";
+  activeGroup = button.dataset.categoryName || "all";
+  categoryPanelOpen = false;
+  render();
+  els.libraryGrid?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+els.clearFilters?.addEventListener("click", () => {
+  resetHomeView();
 });
 
 document.addEventListener("click", (event) => {

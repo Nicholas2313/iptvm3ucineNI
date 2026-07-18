@@ -27,6 +27,7 @@
           <div class="profile-menu">
             <button id="profile-menu-btn" class="profile-menu-btn" type="button" aria-haspopup="true" aria-expanded="false">
               <img id="active-avatar" class="profile-avatar" alt="Foto de perfil ativa" width="48" height="48" />
+              <span id="active-profile-label" class="active-profile-label">Perfil 1</span>
             </button>
             <div id="profile-menu-panel" class="profile-menu-panel" hidden>
               <div class="profile-menu-head">
@@ -41,13 +42,11 @@
                 <strong id="profile-library-count">0 títulos</strong>
               </div>
               <button id="edit-profile-menu-btn" class="menu-item" type="button">Meu perfil</button>
-              <button class="menu-item" type="button" data-focus-search>Solicitar filme ou série</button>
               <button class="menu-item" type="button" data-reload-library>Recarregar lista</button>
               <button class="install-btn menu-item" type="button">Instalar app</button>
               <button id="exit-btn" class="menu-item danger" type="button">Sair do perfil</button>
             </div>
           </div>
-          <span id="active-profile-label" class="active-profile-label">Perfil 1</span>
         </div>
       </header>
 
@@ -132,15 +131,41 @@
           <nav class="main-nav" id="tabs" aria-label="Navegação principal">
             <button class="tab" data-tab="movies" type="button">Filmes</button>
             <button class="tab" data-tab="series" type="button">Séries</button>
+            <button id="category-toggle" class="tab category-toggle" type="button" aria-expanded="false" aria-controls="category-panel">Categorias</button>
           </nav>
           <label class="global-search header-search">
             <span>Buscar</span>
             <input id="search-input" type="search" placeholder="Pesquisar filme, série, ator, categoria ou episódio..." />
           </label>
+          <button id="clear-filters" class="ghost-btn clear-filters-btn" type="button" hidden>Limpar filtros</button>
           <label class="select-box">
             <span>Filtro de categoria</span>
             <select id="group-filter"></select>
           </label>
+        </section>
+
+        <section id="category-panel" class="category-panel" hidden>
+          <div class="category-panel-head">
+            <div>
+              <h2>Categorias</h2>
+              <p>Escolha um gênero existente no catálogo carregado.</p>
+            </div>
+            <button id="category-close" class="ghost-btn" type="button">Fechar</button>
+          </div>
+          <label class="category-search">
+            <span>Pesquisar categoria</span>
+            <input id="category-search" type="search" placeholder="Digite o nome da categoria..." />
+          </label>
+          <div class="category-columns">
+            <div class="category-group">
+              <h3>Filmes</h3>
+              <div id="movie-category-list" class="category-list"></div>
+            </div>
+            <div class="category-group">
+              <h3>Séries</h3>
+              <div id="series-category-list" class="category-list"></div>
+            </div>
+          </div>
         </section>
 
         <section id="search-results-section" class="rail-section search-only-section">
