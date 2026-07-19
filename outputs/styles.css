@@ -3155,6 +3155,63 @@ select:focus,
   }
 }
 
+.hero-watch-time,
+.episode-progress-time,
+.card-progress-time {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin: 8px 0 0;
+  color: #9fdfff;
+  font-size: clamp(15px, 1vw, 18px);
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.hero-watch-time::before,
+.episode-progress-time::before,
+.card-progress-time::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--neon-blue);
+  box-shadow: 0 0 10px rgba(0, 191, 255, 0.6);
+}
+
+.episode-live-time {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid rgba(34, 211, 255, 0.46);
+  border-radius: 999px;
+  color: #c8f4ff;
+  background: rgba(0, 191, 255, 0.12);
+  font-size: clamp(13px, 0.95vw, 16px);
+  font-weight: 700;
+}
+
+.inline-episode-card.active .episode-progress-time,
+.inline-episode-card.active .episode-live-time {
+  color: #f5fcff;
+}
+
+@media (min-width: 1600px) {
+  .hero-watch-time,
+  .episode-progress-time,
+  .card-progress-time {
+    font-size: clamp(19px, 1.12vw, 23px);
+  }
+
+  .episode-live-time {
+    min-height: 34px;
+    font-size: clamp(18px, 1.05vw, 22px);
+  }
+}
+
 body:not(.profile-gate) .profile-menu-btn:hover,
 body:not(.profile-gate) .profile-menu-btn:focus-visible,
 .profile-menu-btn:hover,

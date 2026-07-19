@@ -85,6 +85,7 @@ const els = {
   heroMeta: document.getElementById("hero-meta"),
   heroEpisodeTitle: document.getElementById("hero-episode-title"),
   heroDescription: document.getElementById("hero-description"),
+  heroWatchTime: document.getElementById("hero-watch-time"),
   heroContinueBtn: document.getElementById("hero-continue-btn"),
   heroFavoriteBtn: document.getElementById("hero-favorite-btn"),
   featuredBanner: document.getElementById("featured-banner"),
@@ -847,6 +848,7 @@ function saveActivePlaybackProgress(options = {}) {
   if (!activePlayback || !els.player) return;
   const currentTime = Number(els.player.currentTime || 0);
   const duration = Number(els.player.duration || 0);
+  if (duration > 0) activePlayback.duration = duration;
   savePlaybackProgress(activePlayback.profileId, activePlayback, currentTime, duration, options);
   lastPlaybackSaveAt = Date.now();
 }
@@ -869,6 +871,61 @@ function getProfileContinueItems(profile) {
 function getProgressPercent(entry) {
   if (!entry || !entry.duration) return 0;
   return Math.max(0, Math.min(100, (entry.currentTime / entry.duration) * 100));
+}
+
+function getProgressTimeLabel(entry) {
+  if (!entry || !Number(entry.currentTime || 0)) return "";
+  const current = formatTimeLabel(entry.currentTime);
+  const duration = Number(entry.duration || 0) > 0 ? ` de ${formatTimeLabel(entry.duration)}` : "";
+  return `${current}${duration}`;
+}
+
+function updateCurrentPlaybackTimeDisplay() {
+  if (!els.heroWatchTime) return;
+  const player = els.player;
+  if (!player || !activePlayback) {
+    els.heroWatchTime.hidden = true;
+    els.heroWatchTime.textContent = "";
+    return;
+  }
+  const currentTime = Number(player.currentTime || 0);
+  const duration = Number(player.duration || activePlayback.duration || 0);
+  els.heroWatchTime.hidden = false;
+  els.heroWatchTime.textContent = duration > 0
+    ? `${formatTimeLabel(currentTime)} / ${formatTimeLabel(duration)}`
+    : `${formatTimeLabel(currentTime)} assistidos`;
+}
+
+function updateVisibleEpisodeProgressDisplay() {
+  if (!activePlayback || !els.playerEpisodeList || !els.player) return;
+  const key = buildPlaybackKey(activePlayback);
+  const currentTime = Number(els.player.currentTime || 0);
+  const duration = Number(els.player.duration || activePlayback.duration || 0);
+  const percent = duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0;
+
+  els.playerEpisodeList.querySelectorAll("[data-episode-id]").forEach((card) => {
+    const episodeId = card.getAttribute("data-episode-id");
+    const episode = inlineSeriesState.details?.seasons
+      ?.flatMap((season) => season.episodes || [])
+      .find((item) => item.id === episodeId);
+    if (!episode || buildPlaybackKey(episode) !== key) return;
+    let label = card.querySelector(".episode-progress-time");
+    if (!label) {
+      label = document.createElement("p");
+      label.className = "episode-progress-time";
+      card.querySelector(".inline-episode-copy")?.appendChild(label);
+    }
+    label.textContent = duration > 0 ? `${formatTimeLabel(currentTime)} de ${formatTimeLabel(duration)}` : `${formatTimeLabel(currentTime)} assistidos`;
+    let meter = card.querySelector(".progress-meter");
+    if (!meter) {
+      meter = document.createElement("div");
+      meter.className = "progress-meter";
+      meter.innerHTML = "<span></span>";
+      card.querySelector(".inline-episode-copy")?.appendChild(meter);
+    }
+    const bar = meter.querySelector("span");
+    if (bar) bar.style.width = `${percent}%`;
+  });
 }
 
 function buildPlayableEntry(entry) {
@@ -1825,6 +1882,8 @@ function renderStreamingCard(item, profile, favoriteSet = null) {
   const selected = item.id === selectedItemId;
   const primaryAction = item.kind === "series" ? "Temporadas" : "Assistir";
   const poster = item.logo || defaultAvatar(item.title);
+  const progress = getItemProgress(profile, item);
+  const progressLabel = getProgressTimeLabel(progress);
   return `
     <article class="media-card ${selected ? "selected" : ""}" data-item-id="${escapeHtml(item.id)}">
       <div class="poster-frame">
@@ -1835,6 +1894,7 @@ function renderStreamingCard(item, profile, favoriteSet = null) {
       <div class="media-info">
         <h4>${escapeHtml(item.title)}</h4>
         <p>${escapeHtml(item.group || "M3UCINE")}</p>
+        ${progressLabel ? `<p class="card-progress-time">${escapeHtml(progressLabel)}</p>` : ""}
       </div>
       <div class="card-actions">
         <button class="card-button play-button" type="button">${primaryAction}</button>
@@ -2184,18 +2244,32 @@ function renderInlineEpisodeCard(episode, profile) {
   const episodeNumber = episode.episodeNumber ? String(episode.episodeNumber).padStart(2, "0") : "--";
   const poster = episode.logo || inlineSeriesState.seriesItem?.logo || defaultAvatar(episode.title);
   const progress = getSavedPlaybackEntry(profile.id, episode);
+  const isCurrent =
+    activePlayback &&
+    activePlayback.profileId === profile.id &&
+    buildPlaybackKey(activePlayback) === buildPlaybackKey(episode);
+  const currentProgress =
+    isCurrent && els.player
+      ? {
+          currentTime: Number(els.player.currentTime || 0),
+          duration: Number(els.player.duration || activePlayback.duration || progress?.duration || 0),
+        }
+      : progress;
+  const progressLabel = getProgressTimeLabel(currentProgress);
   const duration = episode.duration ? `<span>${escapeHtml(formatDurationText(episode.duration))}</span>` : "";
   return `
-    <article class="inline-episode-card ${inlineSeriesState.selectedEpisodeId === episode.id ? "active" : ""}" data-episode-id="${escapeHtml(episode.id)}">
+    <article class="inline-episode-card ${inlineSeriesState.selectedEpisodeId === episode.id || isCurrent ? "active" : ""}" data-episode-id="${escapeHtml(episode.id)}">
       <img class="inline-episode-poster" src="${poster}" alt="${escapeHtml(episode.fullTitle || episode.title)}" width="178" height="100" loading="lazy" />
       <div class="inline-episode-copy">
         <div class="episode-topline">
           <span class="episode-index">${episodeNumber}</span>
           ${duration}
+          ${isCurrent ? `<span class="episode-live-time">Assistindo agora</span>` : ""}
         </div>
         <h4>${escapeHtml(episode.title || `Episódio ${episodeNumber}`)}</h4>
         <p>${escapeHtml(episode.plot || "Episódio disponível para reprodução.")}</p>
-        ${progress ? `<div class="progress-meter"><span style="width:${getProgressPercent(progress)}%"></span></div>` : ""}
+        ${progressLabel ? `<p class="episode-progress-time">${escapeHtml(progressLabel)}</p>` : ""}
+        ${currentProgress ? `<div class="progress-meter"><span style="width:${getProgressPercent(currentProgress)}%"></span></div>` : ""}
       </div>
       <button class="episode-play-btn" type="button" data-play-inline-episode="${escapeHtml(episode.id)}">Assistir</button>
     </article>
@@ -2919,6 +2993,7 @@ function updateStreamingPlayer(profile, item) {
   if (!playable) {
     if (activePlayback && activePlayback.profileId === profile.id) saveActivePlaybackProgress();
     activePlayback = null;
+    updateCurrentPlaybackTimeDisplay();
     playbackRestoreTime = 0;
     lastPlaybackSaveAt = 0;
     els.player.removeAttribute("src");
@@ -2956,6 +3031,7 @@ function updateStreamingPlayer(profile, item) {
   if (els.openLink) {
     els.openLink.onclick = () => window.open(mediaUrl, "_blank", "noopener,noreferrer");
   }
+  updateCurrentPlaybackTimeDisplay();
   window.requestAnimationFrame(() => {
     els.player?.focus({ preventScroll: true });
   });
@@ -3588,6 +3664,7 @@ els.player?.addEventListener("error", () => {
 
 els.player?.addEventListener("loadedmetadata", () => {
   if (!els.player || !activePlayback) return;
+  updateCurrentPlaybackTimeDisplay();
   if (playbackRestoreTime > 0) {
     const maxSeek = Math.max(0, Number(els.player.duration || 0) - 5);
     const restore = Math.min(playbackRestoreTime, maxSeek || playbackRestoreTime);
@@ -3602,6 +3679,8 @@ els.player?.addEventListener("loadedmetadata", () => {
 
 els.player?.addEventListener("timeupdate", () => {
   if (!activePlayback || !els.player) return;
+  updateCurrentPlaybackTimeDisplay();
+  updateVisibleEpisodeProgressDisplay();
   const now = Date.now();
   if (now - lastPlaybackSaveAt >= PLAYBACK_SAVE_INTERVAL_MS) {
     saveActivePlaybackProgress();
