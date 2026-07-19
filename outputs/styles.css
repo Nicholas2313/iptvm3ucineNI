@@ -2670,15 +2670,15 @@ body.profile-gate .content {
 
 .main-playlist-status,
 body:not(.profile-gate) .main-playlist-status {
-  width: 100%;
-  max-width: none;
+  width: fit-content;
+  max-width: min(100%, 520px);
   min-height: 34px;
-  margin: 0;
-  padding: 8px 16px;
-  border-width: 0 0 1px;
-  border-radius: 0;
+  margin: -4px auto 0;
+  padding: 7px 14px;
+  border: 1px solid rgba(24, 59, 97, 0.85);
+  border-radius: 999px;
   color: #b9d8ff;
-  background: #071225;
+  background: rgba(7, 18, 37, 0.86);
 }
 
 .playlist-status[data-state="loading"] #catalog-status::before {
