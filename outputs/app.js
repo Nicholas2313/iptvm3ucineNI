@@ -21,6 +21,7 @@ const SEARCH_RENDER_DELAY_MS = 45;
 const MAX_SEARCH_RESULTS = 96;
 const MAX_PROFILES = 4;
 const PROFILE_THEMES = ["blue", "pink", "violet", "green"];
+const DORAMAS_CATEGORY = "__m3ucine_doramas__";
 const DEV_CATALOG_AUDIT = ["localhost", "127.0.0.1"].includes(location.hostname) || location.protocol === "file:";
 
 const els = {
@@ -1343,7 +1344,9 @@ function getCurrentLibrary(profile) {
 }
 
 function matchesGroupFilter(item) {
-  return activeGroup === "all" || (item.group || "").toLowerCase() === activeGroup.toLowerCase();
+  if (activeGroup === "all") return true;
+  if (activeGroup === DORAMAS_CATEGORY) return isDoramaItem(item);
+  return (item.group || "").toLowerCase() === activeGroup.toLowerCase();
 }
 
 function getItemSearchIndex(item) {
@@ -1541,6 +1544,15 @@ function isTvChannelCategory(group) {
   return /\b(canal|canais|canales|channel|channels|tv ao vivo|ao vivo|live tv|iptv|broadcast|24h|24 horas|ppv|premiere|jornal|noticias?|esportes? ao vivo|futebol ao vivo|tv aberta|tv fechada|abertos|globo|record|sbt|band|rede tv|cnn|fox sports|espn|sportv|radio|radios)\b/.test(text);
 }
 
+function isDoramaItem(item) {
+  const text = normalizeText(`${item?.title || ""} ${item?.group || ""} ${item?.searchText || ""} ${item?.source || ""}`);
+  return /\b(dorama|doramas|kdrama|k drama|k-drama|cdrama|c drama|c-drama|jdrama|j drama|j-drama|drama coreano|drama chines|drama chinesa|drama japones|drama japonesa|novela coreana|novela chinesa|novela japonesa|novela asiatica|series asiaticas|serie asiatica|asiaticas|asiaticos|coreanas|coreanos|coreano|coreana|korean|korea|chinesas|chineses|japonesas|japoneses|thai drama|lakorn|asian drama|korean drama|chinese drama|japanese drama)\b/.test(text);
+}
+
+function getCategoryDisplayName(group) {
+  return group === DORAMAS_CATEGORY ? "Doramas" : group;
+}
+
 function getLibraryMeta(profile) {
   const library = profile.library || [];
   const cached = libraryMetaCache.get(library);
@@ -1552,9 +1564,11 @@ function getLibraryMeta(profile) {
   const movieGroups = new Set();
   const seriesGroups = new Set();
   const itemById = new Map();
+  let hasDoramas = false;
   for (const item of library) {
     const group = item.group || "Geral";
     const isChannelGroup = isTvChannelCategory(group);
+    if (!isChannelGroup && isDoramaItem(item)) hasDoramas = true;
     if (item.type === "movie") {
       movieCount += 1;
       if (!isChannelGroup) movieGroups.add(group);
@@ -1566,6 +1580,7 @@ function getLibraryMeta(profile) {
     if (!isChannelGroup) groups.add(group);
     if (item.id) itemById.set(item.id, item);
   }
+  if (hasDoramas) seriesGroups.add(DORAMAS_CATEGORY);
 
   const groupOptions = [
     `<option value="all">Todas as categorias</option>`,
@@ -1583,17 +1598,19 @@ function buildGroupOptions(profile) {
 }
 
 function categoryButtonHtml(group, type) {
-  const active = activeGroup === group && activeTab === type;
+  const filterType = group === DORAMAS_CATEGORY ? "all" : type;
+  const active = activeGroup === group && (activeTab === filterType || group === DORAMAS_CATEGORY);
+  const label = getCategoryDisplayName(group);
   return `
-    <button class="category-option ${active ? "active" : ""}" type="button" data-category-type="${type}" data-category-name="${escapeHtml(group)}">
-      ${escapeHtml(group)}
+    <button class="category-option ${active ? "active" : ""}" type="button" data-category-type="${filterType}" data-category-name="${escapeHtml(group)}">
+      ${escapeHtml(label)}
     </button>
   `;
 }
 
 function renderCategoryList(groups, type) {
   const query = normalizeText(categorySearchTerm);
-  const filtered = groups.filter((group) => !query || normalizeText(group).includes(query));
+  const filtered = groups.filter((group) => !query || normalizeText(getCategoryDisplayName(group)).includes(query));
   if (!filtered.length) return `<p class="empty-note category-empty">Nenhuma categoria encontrada.</p>`;
   return filtered.map((group) => categoryButtonHtml(group, type)).join("");
 }
@@ -2993,7 +3010,7 @@ function render(options = {}) {
   if (els.libraryTitle) {
     els.libraryTitle.textContent =
       activeGroup !== "all"
-        ? activeGroup
+        ? getCategoryDisplayName(activeGroup)
         : hasResultView
           ? titleTab === "all"
             ? "Resultados da busca"
