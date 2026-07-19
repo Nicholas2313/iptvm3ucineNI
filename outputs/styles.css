@@ -2725,6 +2725,452 @@ body:not(.profile-gate) #favorites-section {
   display: none !important;
 }
 
+/* Final header simplification, readable type, neon-blue controls, and TV focus states. */
+:root {
+  --neon-blue: #00bfff;
+  --neon-blue-soft: #22d3ff;
+  --button-blue: rgba(6, 42, 70, 0.82);
+  --button-blue-hover: #07466f;
+  --button-blue-pressed: #05243d;
+  --button-text: #f5fcff;
+  --tv-safe-x: clamp(16px, 4vw, 72px);
+}
+
+body {
+  font-size: clamp(16px, 1.08vw, 19px);
+}
+
+body:not(.profile-gate) .topbar,
+.topbar {
+  min-height: clamp(58px, 5vw, 76px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px var(--tv-safe-x);
+  border-bottom: 1px solid rgba(0, 191, 255, 0.14);
+  background: rgba(5, 11, 24, 0.98);
+}
+
+.brand-wrap {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+body:not(.profile-gate) .site-logo-image,
+.site-logo-image {
+  width: clamp(132px, 12vw, 190px);
+  max-height: 44px;
+}
+
+.header-nav,
+.header-search-btn {
+  display: none !important;
+}
+
+.top-actions,
+body:not(.profile-gate) .top-actions,
+.header-actions {
+  flex: 0 0 auto;
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+body:not(.profile-gate) .profile-menu-btn,
+.profile-menu-btn {
+  width: auto;
+  height: auto;
+  min-height: 0;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--button-text);
+  background: transparent !important;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.profile-menu-btn .profile-avatar,
+body:not(.profile-gate) .profile-menu-btn .profile-avatar {
+  width: clamp(48px, 3.7vw, 62px);
+  height: clamp(48px, 3.7vw, 62px);
+  border: 1.5px solid rgba(34, 211, 255, 0.72);
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 12px rgba(0, 191, 255, 0.18);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.profile-trigger-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  max-width: 120px;
+  min-width: 0;
+}
+
+body:not(.profile-gate) .active-profile-label,
+.active-profile-label {
+  display: block;
+  max-width: 96px;
+  color: #dceeff;
+  font-size: clamp(16px, 1.1vw, 18px);
+  font-weight: 650;
+  line-height: 1.08;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 180ms ease;
+}
+
+.profile-trigger-arrow {
+  color: var(--neon-blue-soft);
+  font-size: 0.72em;
+  line-height: 1;
+}
+
+.profile-menu-btn:hover .profile-avatar,
+.profile-menu-btn:focus-visible .profile-avatar {
+  transform: scale(1.06);
+  border-color: var(--neon-blue-soft);
+  box-shadow: 0 0 14px rgba(0, 191, 255, 0.52), 0 0 28px rgba(0, 191, 255, 0.2);
+}
+
+.profile-menu-btn:hover .active-profile-label,
+.profile-menu-btn:focus-visible .active-profile-label {
+  color: #ffffff;
+}
+
+.profile-menu-panel {
+  right: 0;
+  width: min(320px, calc(100vw - 28px));
+  border: 1px solid rgba(0, 191, 255, 0.28);
+  border-radius: 16px;
+  background: #08162a;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.34), 0 0 22px rgba(0, 191, 255, 0.1);
+}
+
+.menu-item,
+.tab,
+.primary-btn,
+.ghost-btn,
+.small-btn,
+.card-button,
+.episode-play-btn,
+.action-link,
+.category-option,
+.carousel-arrow,
+.manage-profiles-btn,
+.more-menu summary,
+button {
+  border-color: rgba(0, 191, 255, 0.55);
+  color: var(--button-text);
+  background: var(--button-blue);
+  box-shadow: 0 0 10px rgba(0, 191, 255, 0.12);
+  font-size: clamp(17px, 1.12vw, 19px);
+  font-weight: 600;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease, opacity 180ms ease;
+}
+
+.menu-item:hover,
+.tab:hover,
+.ghost-btn:hover,
+.primary-btn:hover,
+.small-btn:hover,
+.card-button:hover,
+.episode-play-btn:hover,
+.action-link:hover,
+.category-option:hover,
+.carousel-arrow:hover,
+.manage-profiles-btn:hover,
+.more-menu summary:hover,
+button:hover {
+  border-color: var(--neon-blue-soft);
+  color: #ffffff;
+  background: var(--button-blue-hover);
+  box-shadow: 0 0 12px rgba(0, 191, 255, 0.42), 0 0 24px rgba(0, 191, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.menu-item:active,
+.tab:active,
+.ghost-btn:active,
+.primary-btn:active,
+.small-btn:active,
+.card-button:active,
+.episode-play-btn:active,
+.action-link:active,
+.category-option:active,
+button:active {
+  background: var(--button-blue-pressed);
+  transform: scale(0.98);
+  box-shadow: 0 0 7px rgba(0, 191, 255, 0.22);
+}
+
+.tab.active,
+.category-option.active,
+.primary-btn,
+.small-btn.play-button,
+.episode-play-btn,
+.card-button.play-button {
+  border-color: var(--neon-blue-soft);
+  color: #ffffff;
+  background: linear-gradient(180deg, rgba(0, 191, 255, 0.95), rgba(0, 112, 210, 0.92));
+  box-shadow: 0 0 13px rgba(0, 191, 255, 0.48), 0 0 28px rgba(0, 191, 255, 0.2);
+}
+
+.danger,
+.menu-item.danger {
+  color: var(--button-text);
+  border-color: rgba(0, 191, 255, 0.42);
+  background: var(--button-blue);
+}
+
+.danger:hover,
+.danger:focus-visible,
+.menu-item.danger:hover,
+.menu-item.danger:focus-visible {
+  color: #ffd7dd;
+  border-color: rgba(255, 91, 115, 0.8);
+  background: rgba(94, 16, 32, 0.72);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+.interactive-item:focus-visible,
+.media-card:focus-visible,
+.continue-card:focus-visible,
+.episode-card:focus-visible,
+.category-option:focus-visible,
+.profile-card:focus-visible,
+.profile-menu-btn:focus-visible,
+.video-player:focus-visible {
+  outline: 3px solid var(--neon-blue-soft);
+  outline-offset: 4px;
+  box-shadow: 0 0 10px rgba(0, 191, 255, 0.75), 0 0 22px rgba(0, 191, 255, 0.35);
+}
+
+body:not(.profile-gate) .content {
+  padding-inline: var(--tv-safe-x);
+}
+
+.player-empty {
+  font-size: clamp(20px, 1.35vw, 24px);
+}
+
+.player-empty::before {
+  width: clamp(52px, 4vw, 72px);
+  height: clamp(52px, 4vw, 72px);
+  font-size: clamp(1.5rem, 1.8vw, 2rem);
+}
+
+.player-empty::after {
+  font-size: clamp(16px, 1.05vw, 19px);
+}
+
+#player-empty,
+#hero-description,
+#hero-meta,
+.section-head p,
+.media-info p,
+.continue-body p,
+.series-modal-overview,
+.episode-description,
+.playlist-status {
+  font-size: clamp(15px, 1vw, 18px);
+}
+
+.hero-copy h1,
+#hero-headline,
+.section-head h2 {
+  font-size: clamp(24px, 2vw, 30px);
+  font-weight: 700;
+}
+
+#hero-episode-title,
+.player-empty,
+.media-info h4,
+.continue-body h4 {
+  font-size: clamp(20px, 1.45vw, 24px);
+  font-weight: 700;
+}
+
+.media-info h4,
+.episode-card h4 {
+  font-size: clamp(17px, 1.15vw, 20px);
+}
+
+input,
+select,
+.global-search input,
+body:not(.profile-gate) .filter-strip .global-search input {
+  min-height: 50px;
+  border-color: rgba(0, 191, 255, 0.42);
+  color: var(--button-text);
+  background: rgba(5, 11, 24, 0.9);
+  font-size: clamp(17px, 1.1vw, 19px);
+}
+
+input:focus,
+select:focus,
+.global-search input:focus {
+  border-color: var(--neon-blue-soft);
+  box-shadow: 0 0 0 3px rgba(0, 191, 255, 0.16), 0 0 18px rgba(0, 191, 255, 0.18);
+}
+
+@media (max-width: 820px) {
+  body:not(.profile-gate) .topbar,
+  .topbar {
+    min-height: 58px;
+    flex-wrap: nowrap;
+    padding: 8px clamp(14px, 4vw, 20px);
+  }
+
+  .brand-wrap {
+    flex: 1 1 auto;
+  }
+
+  body:not(.profile-gate) .site-logo-image,
+  .site-logo-image {
+    width: clamp(118px, 34vw, 150px);
+  }
+
+  .top-actions {
+    position: static;
+  }
+
+  .profile-trigger-copy {
+    display: none;
+  }
+
+  .profile-menu-btn .profile-avatar,
+  body:not(.profile-gate) .profile-menu-btn .profile-avatar {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+@media (min-width: 1600px) {
+  body {
+    font-size: 20px;
+  }
+
+  body:not(.profile-gate) .topbar,
+  .topbar {
+    min-height: 88px;
+  }
+
+  body:not(.profile-gate) .site-logo-image,
+  .site-logo-image {
+    width: clamp(180px, 11vw, 240px);
+    max-height: 58px;
+  }
+
+  .profile-menu-btn .profile-avatar,
+  body:not(.profile-gate) .profile-menu-btn .profile-avatar {
+    width: clamp(64px, 4vw, 82px);
+    height: clamp(64px, 4vw, 82px);
+    border-width: 2px;
+  }
+
+  body:not(.profile-gate) .active-profile-label,
+  .active-profile-label {
+    max-width: 140px;
+    font-size: clamp(20px, 1.25vw, 24px);
+  }
+
+  .hero-copy h1,
+  #hero-headline,
+  .section-head h2,
+  .main-title {
+    font-size: clamp(34px, 2.4vw, 44px);
+  }
+
+  .player-empty,
+  #hero-episode-title,
+  .media-info h4,
+  .continue-body h4,
+  .episode-card h4 {
+    font-size: clamp(24px, 1.55vw, 30px);
+  }
+
+  .section-head p,
+  .media-info p,
+  .continue-body p,
+  .playlist-status,
+  #hero-meta,
+  #hero-description {
+    font-size: clamp(19px, 1.1vw, 22px);
+  }
+
+  button,
+  input,
+  select,
+  .menu-item,
+  .tab,
+  .category-option,
+  .ghost-btn,
+  .primary-btn,
+  .small-btn,
+  .card-button,
+  .episode-play-btn {
+    min-height: 56px;
+    font-size: clamp(22px, 1.5vw, 28px);
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  summary:focus-visible,
+  .media-card:focus-visible,
+  .episode-card:focus-visible,
+  .profile-menu-btn:focus-visible,
+  .video-player:focus-visible {
+    outline-width: 3px;
+    outline-offset: 5px;
+    transform: scale(1.05);
+  }
+
+  body:not(.profile-gate) .player-shell {
+    max-width: min(92vw, 1800px);
+  }
+}
+
+@media (min-width: 3000px) {
+  body:not(.profile-gate) .player-shell {
+    max-width: min(92vw, 2800px);
+  }
+
+  body:not(.profile-gate) .content {
+    gap: 28px;
+  }
+}
+
+body:not(.profile-gate) .profile-menu-btn:hover,
+body:not(.profile-gate) .profile-menu-btn:focus-visible,
+.profile-menu-btn:hover,
+.profile-menu-btn:focus-visible {
+  border: 0;
+  background: transparent !important;
+  box-shadow: none;
+  outline: 0;
+  transform: none;
+}
+
+.profile-menu-btn:focus-visible .profile-avatar {
+  outline: 3px solid var(--neon-blue-soft);
+  outline-offset: 4px;
+}
+
 .main-playlist-status,
 body:not(.profile-gate) .main-playlist-status,
 .playlist-status {

@@ -15,35 +15,21 @@
           <a class="site-logo" href="#top" aria-label="M3U CINE">
             <img src="./assets/logo-m3ucine.webp" alt="M3U CINE" class="site-logo-image" />
           </a>
-          <nav class="header-nav" aria-label="Navegação do catálogo">
-            <button class="header-nav-link active" data-tab="all" type="button">Início</button>
-            <button class="header-nav-link" data-tab="movies" type="button">Filmes</button>
-            <button class="header-nav-link" data-tab="series" type="button">Séries</button>
-          </nav>
         </div>
 
         <div class="top-actions header-actions">
-          <button class="header-search-btn" type="button" data-focus-search aria-label="Pesquisar">⌕</button>
           <div class="profile-menu">
             <button id="profile-menu-btn" class="profile-menu-btn" type="button" aria-haspopup="true" aria-expanded="false">
               <img id="active-avatar" class="profile-avatar" alt="Foto de perfil ativa" width="48" height="48" />
-              <span id="active-profile-label" class="active-profile-label">Perfil 1</span>
+              <span class="profile-trigger-copy">
+                <span id="active-profile-label" class="active-profile-label">Perfil 1</span>
+                <span class="profile-trigger-arrow" aria-hidden="true">▾</span>
+              </span>
             </button>
             <div id="profile-menu-panel" class="profile-menu-panel" hidden>
-              <div class="profile-menu-head">
-                <img id="menu-avatar" class="profile-avatar menu-avatar" alt="Foto de perfil" width="52" height="52" />
-                <div>
-                  <strong id="active-name">Perfil 1</strong>
-                  <small id="active-meta">Catálogo em espera</small>
-                </div>
-              </div>
-              <div class="profile-menu-meta">
-                <span>Biblioteca</span>
-                <strong id="profile-library-count">0 títulos</strong>
-              </div>
               <button id="edit-profile-menu-btn" class="menu-item" type="button">Meu perfil</button>
-              <button class="menu-item" type="button" data-reload-library>Recarregar lista</button>
-              <button class="install-btn menu-item" type="button">Instalar app</button>
+              <button id="manage-profiles-menu-btn" class="menu-item" type="button">Gerenciar perfis</button>
+              <button class="menu-item" type="button" data-reload-library>Recarregar catálogo</button>
               <button id="exit-btn" class="menu-item danger" type="button">Sair do perfil</button>
             </div>
           </div>
@@ -81,7 +67,7 @@
         <section class="hero-grid player-shell">
           <article class="hero-panel">
             <div class="hero-stage">
-              <video id="player" class="video-player" controls playsinline></video>
+              <video id="player" class="video-player" controls playsinline tabindex="0"></video>
               <div id="player-empty" class="player-empty">Nenhuma mídia selecionada</div>
             </div>
 

@@ -34,6 +34,7 @@ const els = {
   profileMenuBtn: document.getElementById("profile-menu-btn"),
   profileMenuPanel: document.getElementById("profile-menu-panel"),
   editProfileMenuBtn: document.getElementById("edit-profile-menu-btn"),
+  manageProfilesMenuBtn: document.getElementById("manage-profiles-menu-btn"),
   profileGrid: document.getElementById("profile-grid"),
   editProfileBtn: document.getElementById("edit-profile-btn"),
   profileModal: document.getElementById("profile-modal"),
@@ -132,6 +133,72 @@ function syncCatalogDom() {
   if (!shouldShowCatalog && isMounted) {
     catalogNodes.forEach((node) => node.parentNode?.removeChild(node));
   }
+}
+
+function closeProfileMenu() {
+  if (els.profileMenuPanel) els.profileMenuPanel.hidden = true;
+  els.profileMenuBtn?.setAttribute("aria-expanded", "false");
+}
+
+function togglePlayerPlayback() {
+  const player = els.player;
+  if (!player || !player.getAttribute("src")) return;
+  if (player.paused) {
+    player.play().catch(() => {});
+  } else {
+    player.pause();
+  }
+}
+
+function isTypingTarget(element) {
+  return ["INPUT", "TEXTAREA", "SELECT"].includes(element?.tagName) || element?.isContentEditable;
+}
+
+function getFocusableElements() {
+  return Array.from(
+    document.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, video[controls], [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((element) => {
+    if (element.closest("[hidden], [aria-hidden='true']")) return false;
+    const rect = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+  });
+}
+
+function moveDirectionalFocus(key) {
+  const focusables = getFocusableElements();
+  if (!focusables.length) return false;
+  const active = document.activeElement && focusables.includes(document.activeElement)
+    ? document.activeElement
+    : focusables[0];
+  const currentRect = active.getBoundingClientRect();
+  const currentX = currentRect.left + currentRect.width / 2;
+  const currentY = currentRect.top + currentRect.height / 2;
+  const vertical = key === "ArrowUp" || key === "ArrowDown";
+  const positive = key === "ArrowRight" || key === "ArrowDown";
+  let best = null;
+  let bestScore = Infinity;
+
+  for (const element of focusables) {
+    if (element === active) continue;
+    const rect = element.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const primary = vertical ? y - currentY : x - currentX;
+    if (positive ? primary <= 8 : primary >= -8) continue;
+    const cross = vertical ? Math.abs(x - currentX) : Math.abs(y - currentY);
+    const score = Math.abs(primary) * 1.1 + cross * 1.8;
+    if (score < bestScore) {
+      best = element;
+      bestScore = score;
+    }
+  }
+
+  if (!best) return false;
+  best.focus({ preventScroll: false });
+  return true;
 }
 
 const state = loadState();
@@ -344,9 +411,9 @@ async function fileToAvatarDataUrl(file, fallbackName) {
   }
 }
 
-function openProfileGate() {
+function openProfileGate({ manage = false } = {}) {
   profileGateOpen = false;
-  profileManageMode = false;
+  profileManageMode = manage;
   document.body.classList.add("profile-gate");
   syncCatalogDom();
   closeProfileEditor();
@@ -2889,6 +2956,9 @@ function updateStreamingPlayer(profile, item) {
   if (els.openLink) {
     els.openLink.onclick = () => window.open(mediaUrl, "_blank", "noopener,noreferrer");
   }
+  window.requestAnimationFrame(() => {
+    els.player?.focus({ preventScroll: true });
+  });
 }
 
 function selectStreamingItem(itemId, profile = getActiveProfile()) {
@@ -3249,8 +3319,7 @@ els.clearFilters?.addEventListener("click", () => {
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-reload-library]");
   if (!button) return;
-  if (els.profileMenuPanel) els.profileMenuPanel.hidden = true;
-  els.profileMenuBtn?.setAttribute("aria-expanded", "false");
+  closeProfileMenu();
   bootstrapLibrary({ force: true });
 });
 
@@ -3317,16 +3386,19 @@ els.profileMenuBtn?.addEventListener("click", (event) => {
 });
 
 els.editProfileMenuBtn?.addEventListener("click", () => {
-  if (els.profileMenuPanel) els.profileMenuPanel.hidden = true;
-  els.profileMenuBtn?.setAttribute("aria-expanded", "false");
+  closeProfileMenu();
   openProfileEditor(getActiveProfile());
+});
+
+els.manageProfilesMenuBtn?.addEventListener("click", () => {
+  closeProfileMenu();
+  openProfileGate({ manage: true });
 });
 
 document.addEventListener("click", (event) => {
   if (!els.profileMenuPanel || els.profileMenuPanel.hidden) return;
   if (event.target.closest(".profile-menu")) return;
-  els.profileMenuPanel.hidden = true;
-  els.profileMenuBtn?.setAttribute("aria-expanded", "false");
+  closeProfileMenu();
 });
 
 document.querySelectorAll("[data-focus-search]").forEach((button) => {
@@ -3640,6 +3712,24 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && currentSeriesState.open) {
     closeSeriesModal();
   }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeProfileMenu();
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    return;
+  }
+  if (!["Enter", " "].includes(event.key)) return;
+  if (event.target !== els.player) return;
+  event.preventDefault();
+  togglePlayerPlayback();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.defaultPrevented || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+  if (isTypingTarget(event.target) || document.body.classList.contains("profile-gate")) return;
+  if (moveDirectionalFocus(event.key)) event.preventDefault();
 });
 
 const savedUrl = localStorage.getItem(LAST_M3U_URL_KEY);
