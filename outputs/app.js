@@ -1535,6 +1535,12 @@ function getStreamingProfileMeta(profile) {
   return profile.library.length > 0 ? "Catalogo conectado" : "Conectando catalogo";
 }
 
+function isTvChannelCategory(group) {
+  const text = normalizeText(group || "");
+  if (!text) return false;
+  return /\b(canal|canais|canales|channel|channels|tv ao vivo|ao vivo|live tv|iptv|broadcast|24h|24 horas|ppv|premiere|jornal|noticias?|esportes? ao vivo|futebol ao vivo|tv aberta|tv fechada|abertos|globo|record|sbt|band|rede tv|cnn|fox sports|espn|sportv|radio|radios)\b/.test(text);
+}
+
 function getLibraryMeta(profile) {
   const library = profile.library || [];
   const cached = libraryMetaCache.get(library);
@@ -1548,15 +1554,16 @@ function getLibraryMeta(profile) {
   const itemById = new Map();
   for (const item of library) {
     const group = item.group || "Geral";
+    const isChannelGroup = isTvChannelCategory(group);
     if (item.type === "movie") {
       movieCount += 1;
-      movieGroups.add(group);
+      if (!isChannelGroup) movieGroups.add(group);
     }
     if (item.type === "series") {
       seriesCount += 1;
-      seriesGroups.add(group);
+      if (!isChannelGroup) seriesGroups.add(group);
     }
-    groups.add(group);
+    if (!isChannelGroup) groups.add(group);
     if (item.id) itemById.set(item.id, item);
   }
 
